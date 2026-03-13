@@ -16,14 +16,19 @@ export default function EditCustomerForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [subscribedAmpere, setSubscribedAmpere] = useState(customer.subscribedAmpere);
+  const isFree = customer.billingType === "FREE";
+  const [freeChecked, setFreeChecked] = useState(isFree);
+  const [freeReason, setFreeReason] = useState(customer.freeReason ?? "");
   const [billingType, setBillingType] = useState<BillingType>(
     ["FREE", "AMPERE_ONLY", "KWH_ONLY", "BOTH"].includes(customer.billingType)
-      ? customer.billingType
+      ? isFree ? "BOTH" : customer.billingType
       : "BOTH"
   );
   const [fixedDiscountAmount, setFixedDiscountAmount] = useState(
     String(customer.fixedDiscountAmount)
   );
+
+  const effectiveBillingType = freeChecked ? "FREE" : billingType;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -32,8 +37,9 @@ export default function EditCustomerForm({
     const result = await updateCustomerAction({
       ...customer,
       subscribedAmpere,
-      billingType,
+      billingType: effectiveBillingType,
       fixedDiscountAmount: parseFloat(fixedDiscountAmount) || 0,
+      freeReason: freeChecked ? freeReason : "",
     });
     setLoading(false);
     if (result.error) {
@@ -60,18 +66,42 @@ export default function EditCustomerForm({
         </select>
       </div>
       <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1">Billing Type</label>
-        <select
-          value={billingType}
-          onChange={(e) => setBillingType(e.target.value as BillingType)}
-          className="input"
-        >
-          <option value="FREE">Free (no charge)</option>
-          <option value="AMPERE_ONLY">Ampere Only</option>
-          <option value="KWH_ONLY">kWh Only</option>
-          <option value="BOTH">Both</option>
-        </select>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={freeChecked}
+            onChange={(e) => setFreeChecked(e.target.checked)}
+            className="rounded border-slate-300"
+          />
+          <span className="text-sm font-medium text-slate-700">Free customer (no charge)</span>
+        </label>
+        {freeChecked && (
+          <div className="mt-2">
+            <label className="block text-sm font-medium text-slate-700 mb-1">Reason</label>
+            <input
+              type="text"
+              value={freeReason}
+              onChange={(e) => setFreeReason(e.target.value)}
+              placeholder="e.g. Family, Employee"
+              className="input"
+            />
+          </div>
+        )}
       </div>
+      {!freeChecked && (
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Billing Type</label>
+          <select
+            value={billingType}
+            onChange={(e) => setBillingType(e.target.value as BillingType)}
+            className="input"
+          >
+            <option value="AMPERE_ONLY">Ampere Only</option>
+            <option value="KWH_ONLY">kWh Only</option>
+            <option value="BOTH">Both</option>
+          </select>
+        </div>
+      )}
       <div>
         <label className="block text-sm font-medium text-slate-700 mb-1">Fixed Discount (LBP)</label>
         <input
