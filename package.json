@@ -9,7 +9,8 @@
     "lint": "next lint",
     "import-csv": "node scripts/import-csv.mjs",
     "clear-db": "node scripts/clear-db.mjs",
-    "inspect-bills": "node scripts/inspect-bills.mjs"
+    "inspect-bills": "node scripts/inspect-bills.mjs",
+    "fix-bills": "node scripts/fix-bills-consumption.mjs"
   },
   "dependencies": {
     "next": "^14.2.0",

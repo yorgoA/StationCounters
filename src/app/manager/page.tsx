@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 
-import { getAllCustomers, getAllBills, getSettings } from "@/lib/google-sheets";
+import { getAllCustomers, getAllBills, getSettings, getAmperePrices } from "@/lib/google-sheets";
+import { getAmperePriceForTier } from "@/lib/billing";
 import Link from "next/link";
 import DashboardMonthSelect from "./DashboardMonthSelect";
 
@@ -29,10 +30,11 @@ export default async function ManagerDashboardPage({
   searchParams: Promise<{ month?: string }>;
 }) {
   const params = await searchParams;
-  const [customers, bills, settings] = await Promise.all([
+  const [customers, bills, settings, ampereTiers] = await Promise.all([
     getAllCustomers(),
     getAllBills(),
     getSettings(),
+    getAmperePrices(),
   ]);
 
   // Default to previous month (billing period - you collect for Feb during March)
@@ -64,6 +66,15 @@ export default async function ManagerDashboardPage({
   const totalUnpaid = unpaidThisMonth + unpaidPreviousMonths;
 
   const totalAmpereBilled = payingBills.reduce((s, b) => s + b.ampereCharge, 0);
+  const freeBillsThisMonth = monthBills.filter((b) => freeCustomerIds.has(b.customerId));
+  const customerMap = new Map(customers.map((c) => [c.customerId, c]));
+  const ampereExpectedInclFree =
+    totalAmpereBilled +
+    freeBillsThisMonth.reduce((s, b) => {
+      const cust = customerMap.get(b.customerId);
+      if (!cust) return s;
+      return s + getAmperePriceForTier(cust.subscribedAmpere, ampereTiers);
+    }, 0);
   const totalConsumptionBilled = payingBills.reduce(
     (s, b) => s + b.consumptionCharge,
     0
@@ -153,19 +164,16 @@ export default async function ManagerDashboardPage({
         </div>
       </div>
 
-      {/* Revenue breakdown: Ampere vs Consumption */}
+      {/* Revenue breakdown: With free (paying only) */}
       <div className="bg-white rounded-lg border border-slate-200 p-6 mb-8">
         <h2 className="font-semibold text-slate-800 mb-4">
-          Revenue Breakdown ({formatMonthKey(monthKey)})
+          With Free ({formatMonthKey(monthKey)}) — Paying only
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <div>
             <p className="text-sm text-slate-500">From Ampere</p>
             <p className="text-xl font-bold text-slate-800">
               {totalAmpereBilled.toLocaleString()} LBP
-            </p>
-            <p className="text-xs text-slate-400 mt-1">
-              Fixed subscription charges
             </p>
           </div>
           <div>
@@ -174,37 +182,55 @@ export default async function ManagerDashboardPage({
               {totalConsumptionBilled.toLocaleString()} LBP
             </p>
             <p className="text-xs text-slate-400 mt-1">
-              {totalKwhPaying.toLocaleString(undefined, {
-                maximumFractionDigits: 0,
-              })}{" "}
-              kWh (paying only)
+              {totalKwhPaying.toLocaleString()} kWh
             </p>
-            {totalKwhInclFree > totalKwhPaying && kwhPrice > 0 && (
-              <p className="text-xs text-slate-500 mt-0.5">
-                Expected if free charged: {consumptionExpectedInclFree.toLocaleString()} LBP (
-                {totalKwhInclFree.toLocaleString()} kWh total)
-              </p>
-            )}
           </div>
           <div>
             <p className="text-sm text-slate-500">Total Billed</p>
             <p className="text-xl font-bold text-slate-800">
               {totalBilled.toLocaleString()} LBP
             </p>
+          </div>
+          <div>
+            <p className="text-sm text-slate-500">Total kWh (all time)</p>
+            <p className="text-xl font-bold text-slate-800">
+              {totalKwhAllTime.toLocaleString(undefined, { maximumFractionDigits: 0 })} kWh
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Revenue breakdown: If free charged */}
+      <div className="bg-white rounded-lg border border-slate-200 p-6 mb-8">
+        <h2 className="font-semibold text-slate-800 mb-4">
+          If Free Charged ({formatMonthKey(monthKey)}) — All customers
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div>
+            <p className="text-sm text-slate-500">From Ampere</p>
+            <p className="text-xl font-bold text-slate-800">
+              {ampereExpectedInclFree.toLocaleString()} LBP
+            </p>
+          </div>
+          <div>
+            <p className="text-sm text-slate-500">From Consumption (kWh)</p>
+            <p className="text-xl font-bold text-slate-800">
+              {consumptionExpectedInclFree.toLocaleString()} LBP
+            </p>
             <p className="text-xs text-slate-400 mt-1">
-              Ampere + Consumption
+              {totalKwhInclFree.toLocaleString()} kWh
+            </p>
+          </div>
+          <div>
+            <p className="text-sm text-slate-500">Total (hypothetical)</p>
+            <p className="text-xl font-bold text-slate-800">
+              {(ampereExpectedInclFree + consumptionExpectedInclFree).toLocaleString()} LBP
             </p>
           </div>
           <div>
             <p className="text-sm text-slate-500">Total kWh (all time)</p>
             <p className="text-xl font-bold text-slate-800">
-              {totalKwhAllTime.toLocaleString(undefined, {
-                maximumFractionDigits: 0,
-              })}{" "}
-              kWh
-            </p>
-            <p className="text-xs text-slate-400 mt-1">
-              All customers, all months
+              {totalKwhAllTime.toLocaleString(undefined, { maximumFractionDigits: 0 })} kWh
             </p>
           </div>
         </div>

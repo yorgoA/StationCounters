@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { updateFreeCustomerAction } from "@/app/actions/customer";
@@ -9,6 +9,20 @@ import type { Customer } from "@/types";
 export default function FreeCustomersList({ customers }: { customers: Customer[] }) {
   const router = useRouter();
   const [updating, setUpdating] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return customers;
+    const q = search.toLowerCase();
+    return customers.filter(
+      (c) =>
+        c.fullName.toLowerCase().includes(q) ||
+        (c.phone && c.phone.includes(search)) ||
+        (c.area && c.area.toLowerCase().includes(q)) ||
+        (c.building && c.building.toLowerCase().includes(q)) ||
+        (c.apartmentNumber && c.apartmentNumber.toLowerCase().includes(q))
+    );
+  }, [customers, search]);
 
   async function handleUncheck(customerId: string) {
     setUpdating(customerId);
@@ -48,7 +62,22 @@ export default function FreeCustomersList({ customers }: { customers: Customer[]
   }
 
   return (
-    <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+    <div>
+      <div className="mb-4">
+        <input
+          type="text"
+          placeholder="Search by name, phone, box, building..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full max-w-md rounded-lg border border-slate-300 px-3 py-2 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500"
+        />
+        {search && (
+          <p className="text-xs text-slate-500 mt-1">
+            {filtered.length} of {customers.length} free customers
+          </p>
+        )}
+      </div>
+      <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
       <table className="min-w-full divide-y divide-slate-200">
         <thead className="bg-slate-50">
           <tr>
@@ -70,7 +99,7 @@ export default function FreeCustomersList({ customers }: { customers: Customer[]
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-200">
-          {customers.map((c) => (
+          {filtered.map((c) => (
             <tr key={c.customerId} className="hover:bg-slate-50">
               <td className="px-4 py-3">
                 <input
@@ -83,7 +112,7 @@ export default function FreeCustomersList({ customers }: { customers: Customer[]
               </td>
               <td className="px-4 py-3">
                 <Link
-                  href={`/manager/customers/${c.customerId}`}
+                  href={`/manager/free-customers/${c.customerId}`}
                   className="font-medium text-slate-800 hover:text-primary-600"
                 >
                   {c.fullName}
@@ -118,7 +147,7 @@ export default function FreeCustomersList({ customers }: { customers: Customer[]
               </td>
               <td className="px-4 py-3 text-right">
                 <Link
-                  href={`/manager/customers/${c.customerId}`}
+                  href={`/manager/free-customers/${c.customerId}`}
                   className="text-primary-600 hover:text-primary-700 text-sm"
                 >
                   View
@@ -128,6 +157,12 @@ export default function FreeCustomersList({ customers }: { customers: Customer[]
           ))}
         </tbody>
       </table>
+      </div>
+      {filtered.length === 0 && search && (
+        <p className="text-slate-500 py-8 text-center">
+          No free customers match &quot;{search}&quot;
+        </p>
+      )}
     </div>
   );
 }
