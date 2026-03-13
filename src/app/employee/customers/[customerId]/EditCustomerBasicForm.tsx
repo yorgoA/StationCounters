@@ -45,7 +45,7 @@ export default function EditCustomerBasicForm({ customer }: { customer: Customer
         />
       </div>
       <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1">Area</label>
+        <label className="block text-sm font-medium text-slate-700 mb-1">Box Number</label>
         <input
           type="text"
           value={area}

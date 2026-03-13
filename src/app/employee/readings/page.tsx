@@ -19,7 +19,7 @@ export default async function EmployeeReadingsPage() {
             <tr>
               <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Name</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Phone</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Area</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Box Number</th>
               <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Action</th>
             </tr>
           </thead>

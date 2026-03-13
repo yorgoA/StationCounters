@@ -38,7 +38,7 @@ export default async function EmployeeCustomerDetailPage({
           </p>
           <details className="mt-4 pt-4 border-t border-slate-100">
             <summary className="text-sm font-medium text-slate-700 cursor-pointer hover:text-primary-600">
-              Edit Phone, Area, Building, Status
+              Edit Phone, Box Number, Building, Status
             </summary>
             <div className="mt-4">
               <EditCustomerBasicForm customer={customer} />

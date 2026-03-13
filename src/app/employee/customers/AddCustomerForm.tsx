@@ -26,7 +26,7 @@ export default function AddCustomerForm({
     const result = await createCustomerAction({
       fullName: data.get("fullName") as string,
       phone: data.get("phone") as string,
-      area: data.get("area") as string,
+      area: data.get("boxNumber") as string,
       building: data.get("building") as string,
       floor: data.get("floor") as string,
       apartmentNumber: data.get("apartmentNumber") as string,
@@ -60,8 +60,8 @@ export default function AddCustomerForm({
           <input name="phone" required className="input" />
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Area *</label>
-          <input name="area" required className="input" />
+          <label className="block text-sm font-medium text-slate-700 mb-1">Box Number *</label>
+          <input name="boxNumber" required className="input" placeholder="e.g. 82" />
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">Building *</label>

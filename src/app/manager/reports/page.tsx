@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 
+import Link from "next/link";
 import { getAllBills } from "@/lib/google-sheets";
 
 function formatMonthKey(monthKey: string) {
@@ -29,6 +30,7 @@ export default async function ManagerReportsPage() {
     const totalCollected = monthBillsList.reduce((s, b) => s + b.totalPaid, 0);
     const totalKwh = monthBillsList.reduce((s, b) => s + b.usageKwh, 0);
     const billCount = monthBillsList.length;
+    const unpaidCount = monthBillsList.filter((b) => b.remainingDue > 0).length;
 
     return {
       monthKey,
@@ -37,6 +39,7 @@ export default async function ManagerReportsPage() {
       totalCollected,
       totalKwh,
       billCount,
+      unpaidCount,
     };
   });
 
@@ -66,6 +69,9 @@ export default async function ManagerReportsPage() {
               <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">
                 kWh
               </th>
+              <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">
+                Unpaid
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200">
@@ -81,6 +87,18 @@ export default async function ManagerReportsPage() {
                 </td>
                 <td className="px-4 py-3 text-right text-slate-600">
                   {r.totalKwh.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                </td>
+                <td className="px-4 py-3 text-center">
+                  {r.unpaidCount > 0 ? (
+                    <Link
+                      href={`/manager/reports/${r.monthKey}/unpaid`}
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-amber-50 text-amber-800 hover:bg-amber-100 font-medium text-sm"
+                    >
+                      View {r.unpaidCount} unpaid
+                    </Link>
+                  ) : (
+                    <span className="text-slate-400 text-sm">All paid</span>
+                  )}
                 </td>
               </tr>
             ))}

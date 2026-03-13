@@ -92,7 +92,7 @@ Edit `.env.local` with:
 Create a Google Sheet with these tabs and headers (exact order matters):
 
 **Tab: Customers**
-- Row 1: `customerId`, `fullName`, `phone`, `area`, `building`, `floor`, `apartmentNumber`, `subscribedAmpere`, `billingType`, `fixedDiscountAmount`, `status`, `notes`, `createdAt`
+- Row 1: `customerId`, `fullName`, `phone`, `area` (box number), `building`, `floor`, `apartmentNumber`, `subscribedAmpere`, `billingType`, `fixedDiscountAmount`, `status`, `notes`, `createdAt`
 
 **Tab: Bills**
 - Row 1: `billId`, `customerId`, `monthKey`, `previousCounter`, `currentCounter`, `usageKwh`, `amperePriceSnapshot`, `kwhPriceSnapshot`, `ampereCharge`, `consumptionCharge`, `discountApplied`, `previousUnpaidBalance`, `totalDue`, `totalPaid`, `remainingDue`, `paymentStatus`, `createdAt`, `updatedAt`
@@ -129,6 +129,21 @@ Open [http://localhost:3000](http://localhost:3000). You'll be redirected to the
 
 - **Manager**: Use the Manager role and `MANAGER_PASSWORD`
 - **Employee**: Use the Employee role and `EMPLOYEE_PASSWORD`
+
+---
+
+## Import CSV
+
+Import customers and bills from a CSV in the format:
+`Client Name`, `BOX NUMBER`, `BUILDING NAME`, `Subscription Type`, `Amps`, `Counter Previous`, `Counter Now`, `Paid till now`, `Total Price`
+
+- **Total Price** = amount due; **Paid till now** = amount paid; diff = 0 → PAID
+- **BOX NUMBER** is stored as the "Box Number" field (shown instead of Area in the app)
+
+```bash
+npm run import-csv -- 2025-02              # FILE.csv, February 2025
+npm run import-csv -- "FILE 2.csv" 2025-02 # custom file + month
+```
 
 ---
 
