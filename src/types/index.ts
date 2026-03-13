@@ -32,8 +32,9 @@ export interface Customer {
   notes: string;
   createdAt: string;
   freeReason?: string;
-  isMonitor?: boolean; // KWH_ONLY or BOTH; links to Ampere customer; excluded from collection
-  linkedCustomerId?: string; // Required when isMonitor: customer whose meter we use
+  isMonitor?: boolean; // Links to main customer; excluded from collection
+  linkedCustomerId?: string; // Deprecated: use linkedCustomerIds
+  linkedCustomerIds?: string[]; // Required when isMonitor: customers whose meters this monitor tracks
 }
 
 export interface CreateCustomerInput {

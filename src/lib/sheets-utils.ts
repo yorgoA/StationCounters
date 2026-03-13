@@ -24,7 +24,13 @@ export function rowToCustomer(row: string[]): Customer {
     freeReason: r[13] || "",
     isMonitor: r[15] === "true" || r[15] === "1",
     linkedCustomerId: r[16] || undefined,
+    linkedCustomerIds: parseLinkedCustomerIds(r[16]),
   };
+}
+
+function parseLinkedCustomerIds(val: string | undefined): string[] {
+  if (!val || !val.trim()) return [];
+  return val.split(",").map((s) => s.trim()).filter(Boolean);
 }
 
 export function customerToRow(c: Customer): string[] {
@@ -45,7 +51,9 @@ export function customerToRow(c: Customer): string[] {
     c.freeReason ?? "",
     String(c.fixedDiscountPercent ?? 0),
     c.isMonitor ? "true" : "false",
-    c.linkedCustomerId ?? "",
+    (c.linkedCustomerIds && c.linkedCustomerIds.length > 0)
+      ? c.linkedCustomerIds.join(",")
+      : (c.linkedCustomerId ?? ""),
   ];
 }
 

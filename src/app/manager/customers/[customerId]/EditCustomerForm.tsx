@@ -34,20 +34,33 @@ export default function EditCustomerForm({
   );
   const [activeChecked, setActiveChecked] = useState(customer.status === "ACTIVE");
   const [monitorChecked, setMonitorChecked] = useState(customer.isMonitor ?? false);
-  const [linkedCustomerId, setLinkedCustomerId] = useState(customer.linkedCustomerId ?? "");
+  const initialLinked =
+    (customer.linkedCustomerIds && customer.linkedCustomerIds.length > 0)
+      ? customer.linkedCustomerIds
+      : (customer.linkedCustomerId ? [customer.linkedCustomerId] : []);
+  const [linkedCustomerIds, setLinkedCustomerIds] = useState<string[]>(initialLinked);
 
   const effectiveBillingType = freeChecked ? "FREE" : billingType;
-  const showMonitorOption = effectiveBillingType === "KWH_ONLY" || effectiveBillingType === "BOTH";
+  const showMonitorOption =
+    effectiveBillingType === "AMPERE_ONLY" ||
+    effectiveBillingType === "KWH_ONLY" ||
+    effectiveBillingType === "BOTH";
 
   const linkableCustomers = allCustomers.filter(
-    (c) => c.customerId !== customer.customerId && (c.billingType === "AMPERE_ONLY" || c.billingType === "BOTH")
+    (c) => c.customerId !== customer.customerId && !c.isMonitor
   );
+
+  function toggleLinked(id: string) {
+    setLinkedCustomerIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    if (showMonitorOption && monitorChecked && !linkedCustomerId.trim()) {
-      setError("Monitor requires a linked customer. Select one from the dropdown.");
+    if (showMonitorOption && monitorChecked && linkedCustomerIds.length === 0) {
+      setError("Monitor requires at least one linked customer.");
       return;
     }
     setLoading(true);
@@ -63,7 +76,7 @@ export default function EditCustomerForm({
       freeReason: freeChecked ? freeReason : "",
       status: activeChecked ? "ACTIVE" : "INACTIVE",
       isMonitor: showMonitorOption && monitorChecked,
-      linkedCustomerId: showMonitorOption && monitorChecked ? linkedCustomerId.trim() || undefined : undefined,
+      linkedCustomerIds: showMonitorOption && monitorChecked ? linkedCustomerIds : undefined,
     });
     setLoading(false);
     if (result.error) {
@@ -135,14 +148,7 @@ export default function EditCustomerForm({
           <label className="block text-sm font-medium text-slate-700 mb-1">Billing Type</label>
           <select
             value={billingType}
-            onChange={(e) => {
-              setBillingType(e.target.value as BillingType);
-              const val = e.target.value as BillingType;
-              if (val !== "KWH_ONLY" && val !== "BOTH") {
-                setMonitorChecked(false);
-                setLinkedCustomerId("");
-              }
-            }}
+            onChange={(e) => setBillingType(e.target.value as BillingType)}
             className="input"
           >
             <option value="AMPERE_ONLY">Ampere Only</option>
@@ -158,7 +164,7 @@ export default function EditCustomerForm({
                 checked={monitorChecked}
                 onChange={(e) => {
                   setMonitorChecked(e.target.checked);
-                  if (!e.target.checked) setLinkedCustomerId("");
+                  if (!e.target.checked) setLinkedCustomerIds([]);
                 }}
                 className="rounded border-slate-300"
               />
@@ -166,21 +172,25 @@ export default function EditCustomerForm({
             </label>
             {monitorChecked && (
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Linked customer (required) *</label>
-                <select
-                  value={linkedCustomerId}
-                  onChange={(e) => setLinkedCustomerId(e.target.value)}
-                  className="input"
-                  required
-                >
-                  <option value="">— Select customer —</option>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Linked customers (required, can select multiple) *</label>
+                <div className="max-h-48 overflow-y-auto border border-slate-200 rounded-lg p-2 space-y-1 bg-white">
                   {linkableCustomers.map((c) => (
-                    <option key={c.customerId} value={c.customerId}>
-                      {c.fullName} • {c.area} {c.building}
-                    </option>
+                    <label key={c.customerId} className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-2 rounded">
+                      <input
+                        type="checkbox"
+                        checked={linkedCustomerIds.includes(c.customerId)}
+                        onChange={() => toggleLinked(c.customerId)}
+                        className="rounded border-slate-300"
+                      />
+                      <span className="text-sm">
+                        {c.fullName} • {c.area} {c.building}
+                      </span>
+                    </label>
                   ))}
-                </select>
-                <p className="text-xs text-slate-500 mt-1">Ampere customer whose line/meter this monitor uses.</p>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  Customers whose meters this monitor tracks. At least one required.
+                </p>
               </div>
             )}
           </div>

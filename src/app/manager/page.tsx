@@ -121,19 +121,6 @@ export default async function ManagerDashboardPage({
     const consumption = kwhPrice > 0 ? Math.round(b.usageKwh * kwhPrice) : b.consumptionCharge;
     return s + consumption;
   }, 0);
-  const monitorsWithBills = monitorBillsThisMonth.map((b) => {
-    const cust = customerMap.get(b.customerId);
-    const consumption = kwhPrice > 0 ? Math.round(b.usageKwh * kwhPrice) : b.consumptionCharge;
-    const amount = consumption;
-    return {
-      customerId: b.customerId,
-      fullName: cust?.fullName ?? b.customerId,
-      area: cust?.area ?? "",
-      building: cust?.building ?? "",
-      usageKwh: b.usageKwh,
-      amount,
-    };
-  });
 
   return (
     <div>
@@ -271,16 +258,24 @@ export default async function ManagerDashboardPage({
         </div>
       </div>
 
-      {/* Monitors (AMPERE_ONLY, tracked but not collected) */}
+      {/* Monitors (tracked but not collected) */}
       {monitorCustomerIds.size > 0 && (
         <div className="bg-white rounded-lg border border-slate-200 p-6 mb-8">
-          <h2 className="font-semibold text-slate-800 mb-4">
-            Monitors ({formatMonthKey(monthKey)})
-          </h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-semibold text-slate-800">
+              Monitors ({formatMonthKey(monthKey)})
+            </h2>
+            <Link
+              href={`/manager/monitors?month=${monthKey}`}
+              className="text-sm font-medium text-primary-600 hover:text-primary-700"
+            >
+              View full Monitors page →
+            </Link>
+          </div>
           <p className="text-sm text-slate-500 mb-4">
-            kWh customers (KWH_ONLY/BOTH) tracked for usage. Excluded from payment collection.
+            Monitors tracked for usage. Excluded from payment collection.
           </p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
               <p className="text-sm text-slate-500">Monitors count</p>
               <p className="text-xl font-bold text-slate-800">{monitorCustomerIds.size}</p>
@@ -298,52 +293,6 @@ export default async function ManagerDashboardPage({
               </p>
             </div>
           </div>
-          {monitorsWithBills.length > 0 ? (
-            <div>
-              <h3 className="font-medium text-slate-700 mb-2">Monitor list</h3>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-slate-200">
-                  <thead className="bg-slate-50">
-                    <tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase">Customer</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-slate-500 uppercase">kWh</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-slate-500 uppercase">Amount (LBP)</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200">
-                    {monitorsWithBills.map((m) => (
-                      <tr key={m.customerId} className="hover:bg-slate-50">
-                        <td className="px-4 py-2">
-                          <Link
-                            href={`/manager/customers/${m.customerId}`}
-                            className="text-slate-700 hover:text-primary-600 font-medium"
-                          >
-                            {m.fullName}
-                          </Link>
-                          {(m.area || m.building) && (
-                            <p className="text-xs text-slate-500">{m.area} {m.building}</p>
-                          )}
-                        </td>
-                        <td className="px-4 py-2 text-right text-slate-700">
-                          {m.usageKwh.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                        </td>
-                        <td className="px-4 py-2 text-right font-medium text-slate-800">
-                          {m.amount.toLocaleString()}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {monitorCustomerIds.size > monitorsWithBills.length && (
-                <p className="text-xs text-slate-500 mt-2">
-                  {monitorCustomerIds.size - monitorsWithBills.length} monitor(s) without reading this month
-                </p>
-              )}
-            </div>
-          ) : (
-            <p className="text-slate-500">No monitor readings for this month.</p>
-          )}
         </div>
       )}
 

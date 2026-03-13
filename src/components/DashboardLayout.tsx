@@ -18,6 +18,7 @@ const employeeNav = [
 
 const managerNav = [
   { href: "/manager", label: "Dashboard" },
+  { href: "/manager/monitors", label: "Monitors" },
   { href: "/manager/reports", label: "Reports" },
   { href: "/manager/customers", label: "Customers" },
   { href: "/manager/free-customers", label: "Free Customers" },
@@ -50,7 +51,7 @@ export default function DashboardLayout({ role, children }: Props) {
                     key={item.href}
                     href={item.href}
                     className={`text-sm font-medium ${
-                      pathname === item.href
+                      pathname === item.href || (item.href !== "/manager" && pathname.startsWith(item.href + "/"))
                         ? "text-primary-600"
                         : "text-slate-600 hover:text-slate-900"
                     }`}
