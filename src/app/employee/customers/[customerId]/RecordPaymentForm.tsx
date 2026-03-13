@@ -96,8 +96,9 @@ export default function RecordPaymentForm({
       </div>
       <div>
         <label className="block text-sm font-medium text-slate-700 mb-1">Payment Method</label>
-        <select name="paymentMethod" className="input">
+        <select name="paymentMethod" className="input" required>
           <option value="CASH">Cash</option>
+          <option value="WISH">Wish</option>
           <option value="CARD">Card</option>
           <option value="TRANSFER">Transfer</option>
         </select>

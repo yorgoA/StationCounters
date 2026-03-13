@@ -15,10 +15,23 @@ export default function CustomerSearch({
 }) {
   const [q, setQ] = useState("");
   const [freeOnly, setFreeOnly] = useState(false);
+  const [boxFilter, setBoxFilter] = useState("");
+  const [buildingFilter, setBuildingFilter] = useState("");
+
+  const uniqueBoxes = useMemo(() => {
+    const set = new Set(initialCustomers.map((c) => c.area).filter(Boolean));
+    return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  }, [initialCustomers]);
+  const uniqueBuildings = useMemo(() => {
+    const set = new Set(initialCustomers.map((c) => c.building).filter(Boolean));
+    return Array.from(set).sort();
+  }, [initialCustomers]);
 
   const filtered = useMemo(() => {
     let list = initialCustomers;
     if (freeOnly) list = list.filter((c) => c.billingType === "FREE");
+    if (boxFilter) list = list.filter((c) => c.area === boxFilter);
+    if (buildingFilter) list = list.filter((c) => c.building === buildingFilter);
     if (!q.trim()) return list;
     const lower = q.toLowerCase();
     return list.filter(
@@ -28,17 +41,41 @@ export default function CustomerSearch({
         (c.area && c.area.toLowerCase().includes(lower)) ||
         (c.building && c.building.toLowerCase().includes(lower))
     );
-  }, [initialCustomers, q, freeOnly]);
+  }, [initialCustomers, q, freeOnly, boxFilter, buildingFilter]);
 
   return (
     <>
       <div className="flex flex-wrap items-center gap-3 mb-4">
         <input
-          placeholder="Search by name, phone, box number, building..."
+          placeholder="Search by name, phone..."
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          className="w-full max-w-md rounded-lg border border-slate-300 px-3 py-2 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500"
+          className="w-full max-w-xs rounded-lg border border-slate-300 px-3 py-2 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500"
         />
+        <select
+          value={boxFilter}
+          onChange={(e) => setBoxFilter(e.target.value)}
+          className="rounded-lg border border-slate-300 px-3 py-2 text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+        >
+          <option value="">All boxes</option>
+          {uniqueBoxes.map((box) => (
+            <option key={box} value={box}>
+              Box {box}
+            </option>
+          ))}
+        </select>
+        <select
+          value={buildingFilter}
+          onChange={(e) => setBuildingFilter(e.target.value)}
+          className="rounded-lg border border-slate-300 px-3 py-2 text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+        >
+          <option value="">All buildings</option>
+          {uniqueBuildings.map((b) => (
+            <option key={b} value={b}>
+              {b}
+            </option>
+          ))}
+        </select>
         {showFreeFilter && (
           <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
             <input
@@ -103,7 +140,9 @@ export default function CustomerSearch({
         </table>
         {filtered.length === 0 && (
           <p className="text-center text-slate-500 py-12">
-            {q.trim() ? "No customers match your search" : "No customers yet"}
+            {q.trim() || boxFilter || buildingFilter || freeOnly
+              ? "No customers match your filters"
+              : "No customers yet"}
           </p>
         )}
       </div>
