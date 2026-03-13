@@ -1,7 +1,6 @@
 export const dynamic = "force-dynamic";
 
 import { getAllBills } from "@/lib/google-sheets";
-import { getAllPayments } from "@/lib/google-sheets";
 
 function formatMonthKey(monthKey: string) {
   const [year, month] = monthKey.split("-");
@@ -10,7 +9,7 @@ function formatMonthKey(monthKey: string) {
 }
 
 export default async function ManagerReportsPage() {
-  const [bills, payments] = await Promise.all([getAllBills(), getAllPayments()]);
+  const bills = await getAllBills();
 
   // Group bills by monthKey
   const monthBills = new Map<string, typeof bills>();
@@ -20,28 +19,14 @@ export default async function ManagerReportsPage() {
     monthBills.set(b.monthKey, list);
   }
 
-  // Group payments by month (paymentDate format: YYYY-MM-DD)
-  const monthPayments = new Map<string, typeof payments>();
-  for (const p of payments) {
-    if (!p.paymentDate || p.paymentDate.length < 7) continue;
-    const monthKey = p.paymentDate.slice(0, 7);
-    const list = monthPayments.get(monthKey) ?? [];
-    list.push(p);
-    monthPayments.set(monthKey, list);
-  }
-
-  const allMonths = new Set([
-    ...Array.from(monthBills.keys()),
-    ...Array.from(monthPayments.keys()),
-  ]);
-  const sortedMonths = Array.from(allMonths).sort().reverse();
+  const sortedMonths = Array.from(monthBills.keys()).sort().reverse();
 
   const rows = sortedMonths.map((monthKey) => {
     const monthBillsList = monthBills.get(monthKey) ?? [];
-    const monthPaymentsList = monthPayments.get(monthKey) ?? [];
 
     const totalBilled = monthBillsList.reduce((s, b) => s + b.totalDue, 0);
-    const totalCollected = monthPaymentsList.reduce((s, p) => s + p.amountPaid, 0);
+    // Use bill.totalPaid so imported "Paid till now" and app-recorded payments both count
+    const totalCollected = monthBillsList.reduce((s, b) => s + b.totalPaid, 0);
     const totalKwh = monthBillsList.reduce((s, b) => s + b.usageKwh, 0);
     const billCount = monthBillsList.length;
 
