@@ -94,6 +94,15 @@ function parseAmount(str) {
   return parseInt(num, 10) || 0;
 }
 
+function getAmperePriceForTier(subscribedAmpere, tiers) {
+  if (!tiers?.length) return 0;
+  const sorted = [...tiers].sort((a, b) => a.amp - b.amp);
+  const exact = sorted.find((t) => t.amp === subscribedAmpere);
+  if (exact) return exact.price;
+  const lower = sorted.filter((t) => t.amp <= subscribedAmpere);
+  return lower.length > 0 ? lower[lower.length - 1].price : sorted[0].price;
+}
+
 function csvRowToCustomerAndBill(row, monthKey) {
   // New format: Client Name, BOX NUMBER, BUILDING NAME, Subscription Type, Amps,
   //             Counter Previous, Counter Now, Paid till now, Total Price
@@ -135,6 +144,7 @@ function csvRowToCustomerAndBill(row, monthKey) {
     freeReason: "",
   };
 
+  // Split into ampereCharge/consumptionCharge is applied later using Settings & AmperePrices
   const bill = {
     billId: generateId("bill"),
     customerId,
@@ -154,9 +164,42 @@ function csvRowToCustomerAndBill(row, monthKey) {
     paymentStatus,
     createdAt: now,
     updatedAt: now,
+    _billingType: billingType,
+    _subscribedAmpere: subscribedAmpere || 10,
   };
 
   return { customer, bill };
+}
+
+function applyAmpereConsumptionSplit(bills, customers, kwhPrice, ampereTiers) {
+  const hasPricing = kwhPrice > 0 || ampereTiers.length > 0;
+  for (let i = 0; i < bills.length; i++) {
+    const b = bills[i];
+    const c = customers[i];
+    const billingType = b._billingType ?? c.billingType ?? "BOTH";
+    const subscribedAmpere = b._subscribedAmpere ?? c.subscribedAmpere ?? 10;
+    const totalDue = b.totalDue;
+    const usageKwh = b.usageKwh;
+
+    const ampPrice = getAmperePriceForTier(subscribedAmpere, ampereTiers);
+    b.amperePriceSnapshot = ampPrice;
+    b.kwhPriceSnapshot = kwhPrice;
+
+    // AMPERE_ONLY: entire total is ampere charge
+    if (billingType === "AMPERE_ONLY") {
+      b.ampereCharge = totalDue;
+      b.consumptionCharge = 0;
+    } else if (hasPricing && kwhPrice > 0) {
+      // BOTH: split by usage * kwhPrice for consumption, rest for ampere
+      const consumptionCharge = Math.round(usageKwh * kwhPrice);
+      b.consumptionCharge = Math.min(consumptionCharge, totalDue);
+      b.ampereCharge = Math.max(0, totalDue - b.consumptionCharge);
+    }
+    // else: keep original (ampereCharge=0, consumptionCharge=totalDue) when no pricing
+
+    delete b._billingType;
+    delete b._subscribedAmpere;
+  }
 }
 
 function customerToRow(c) {
@@ -249,6 +292,33 @@ async function main() {
   });
 
   const sheets = google.sheets({ version: "v4", auth });
+
+  // Fetch Settings and AmperePrices to split totalDue into ampereCharge + consumptionCharge
+  let kwhPrice = 0;
+  let ampereTiers = [];
+  try {
+    const [settingsRes, ampsRes] = await Promise.all([
+      sheets.spreadsheets.values.get({ spreadsheetId, range: "Settings!A:Z" }),
+      sheets.spreadsheets.values.get({ spreadsheetId, range: "AmperePrices!A:Z" }),
+    ]);
+    const settingsRows = settingsRes.data.values || [];
+    const ampsRows = ampsRes.data.values || [];
+    if (settingsRows.length >= 2) {
+      const s = settingsRows[1];
+      kwhPrice = parseFloat(String(s[1] || s[0] || "0")) || 0;
+    }
+    if (ampsRows.length >= 2) {
+      ampereTiers = ampsRows.slice(1).map((r) => ({
+        amp: parseFloat(r[0] || "0") || 0,
+        price: parseFloat(r[1] || "0") || 0,
+      })).filter((t) => t.amp > 0);
+    }
+    console.log(`Using kwhPrice=${kwhPrice}, ${ampereTiers.length} ampere tiers`);
+  } catch (e) {
+    console.warn("Could not fetch Settings/AmperePrices, using ampereCharge=0 for all:", e.message);
+  }
+
+  applyAmpereConsumptionSplit(bills, customers, kwhPrice, ampereTiers);
 
   if (clearFirst) {
     console.log("Clearing Customers, Bills, Payments...");
