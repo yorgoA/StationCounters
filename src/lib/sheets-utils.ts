@@ -22,6 +22,8 @@ export function rowToCustomer(row: string[]): Customer {
     notes: r[11] || "",
     createdAt: r[12] || new Date().toISOString(),
     freeReason: r[13] || "",
+    isMonitor: r[15] === "true" || r[15] === "1",
+    linkedCustomerId: r[16] || undefined,
   };
 }
 
@@ -42,6 +44,8 @@ export function customerToRow(c: Customer): string[] {
     c.createdAt,
     c.freeReason ?? "",
     String(c.fixedDiscountPercent ?? 0),
+    c.isMonitor ? "true" : "false",
+    c.linkedCustomerId ?? "",
   ];
 }
 

@@ -23,8 +23,13 @@ export default async function UnpaidByMonthPage({
     getAllCustomers(),
   ]);
 
+  const freeIds = new Set(customers.filter((c) => c.billingType === "FREE").map((c) => c.customerId));
+  const monitorIds = new Set(customers.filter((c) => c.isMonitor).map((c) => c.customerId));
+  const excludedIds = new Set([...freeIds, ...monitorIds]);
   const monthBills = bills.filter((b) => b.monthKey === monthKey);
-  const unpaidBills = monthBills.filter((b) => b.remainingDue > 0);
+  const unpaidBills = monthBills.filter(
+    (b) => b.remainingDue > 0 && !excludedIds.has(b.customerId)
+  );
   const customerMap = new Map(customers.map((c) => [c.customerId, c]));
 
   const totalUnpaid = unpaidBills.reduce((s, b) => s + b.remainingDue, 0);

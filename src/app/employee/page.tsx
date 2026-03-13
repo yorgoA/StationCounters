@@ -5,7 +5,8 @@ import { getAllCustomers } from "@/lib/google-sheets";
 
 export default async function EmployeeHomePage() {
   const customers = await getAllCustomers();
-  const activeCount = customers.filter((c) => c.status === "ACTIVE").length;
+  const customersExclMonitors = customers.filter((c) => !c.isMonitor);
+  const activeCount = customersExclMonitors.filter((c) => c.status === "ACTIVE").length;
 
   return (
     <div>
@@ -17,7 +18,7 @@ export default async function EmployeeHomePage() {
         >
           <h3 className="font-semibold text-slate-800">Customers</h3>
           <p className="text-2xl font-bold text-primary-600 mt-1">
-            {customers.length} total
+            {customersExclMonitors.length} total
           </p>
           <p className="text-sm text-slate-500 mt-1">{activeCount} active</p>
         </Link>

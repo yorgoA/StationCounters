@@ -8,9 +8,11 @@ import type { AmperePriceTier, Customer, BillingType } from "@/types";
 export default function EditCustomerForm({
   customer,
   ampereTiers,
+  allCustomers,
 }: {
   customer: Customer;
   ampereTiers: AmperePriceTier[];
+  allCustomers: Customer[];
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -31,12 +33,23 @@ export default function EditCustomerForm({
     String(customer.fixedDiscountPercent || "")
   );
   const [activeChecked, setActiveChecked] = useState(customer.status === "ACTIVE");
+  const [monitorChecked, setMonitorChecked] = useState(customer.isMonitor ?? false);
+  const [linkedCustomerId, setLinkedCustomerId] = useState(customer.linkedCustomerId ?? "");
 
   const effectiveBillingType = freeChecked ? "FREE" : billingType;
+  const showMonitorOption = effectiveBillingType === "KWH_ONLY" || effectiveBillingType === "BOTH";
+
+  const linkableCustomers = allCustomers.filter(
+    (c) => c.customerId !== customer.customerId && (c.billingType === "AMPERE_ONLY" || c.billingType === "BOTH")
+  );
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    if (showMonitorOption && monitorChecked && !linkedCustomerId.trim()) {
+      setError("Monitor requires a linked customer. Select one from the dropdown.");
+      return;
+    }
     setLoading(true);
     const amt = parseFloat(fixedDiscountAmount) || 0;
     const pct = parseFloat(fixedDiscountPercent) || 0;
@@ -49,13 +62,16 @@ export default function EditCustomerForm({
       fixedDiscountPercent: useAmount ? 0 : pct,
       freeReason: freeChecked ? freeReason : "",
       status: activeChecked ? "ACTIVE" : "INACTIVE",
+      isMonitor: showMonitorOption && monitorChecked,
+      linkedCustomerId: showMonitorOption && monitorChecked ? linkedCustomerId.trim() || undefined : undefined,
     });
     setLoading(false);
     if (result.error) {
       setError(result.error);
+      alert(result.error);
       return;
     }
-    router.refresh();
+    window.location.reload();
   }
 
   return (
@@ -87,15 +103,19 @@ export default function EditCustomerForm({
         <p className="text-xs text-slate-500 mt-0.5">Inactive customers are excluded from Record Reading and Missing readings. Past bills remain.</p>
       </div>
       <div>
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={freeChecked}
-            onChange={(e) => setFreeChecked(e.target.checked)}
-            className="rounded border-slate-300"
-          />
-          <span className="text-sm font-medium text-slate-700">Free customer (no charge)</span>
-        </label>
+        <label className="block text-sm font-medium text-slate-700 mb-1">Customer type</label>
+        <select
+          value={freeChecked ? "FREE" : "PAYING"}
+          onChange={(e) => {
+            const isFree = e.target.value === "FREE";
+            setFreeChecked(isFree);
+            if (!isFree) setBillingType(billingType || "BOTH");
+          }}
+          className="input"
+        >
+          <option value="FREE">Free (no charge)</option>
+          <option value="PAYING">Paying</option>
+        </select>
         {freeChecked && (
           <div className="mt-2">
             <label className="block text-sm font-medium text-slate-700 mb-1">Reason</label>
@@ -115,7 +135,14 @@ export default function EditCustomerForm({
           <label className="block text-sm font-medium text-slate-700 mb-1">Billing Type</label>
           <select
             value={billingType}
-            onChange={(e) => setBillingType(e.target.value as BillingType)}
+            onChange={(e) => {
+              setBillingType(e.target.value as BillingType);
+              const val = e.target.value as BillingType;
+              if (val !== "KWH_ONLY" && val !== "BOTH") {
+                setMonitorChecked(false);
+                setLinkedCustomerId("");
+              }
+            }}
             className="input"
           >
             <option value="AMPERE_ONLY">Ampere Only</option>
@@ -123,6 +150,41 @@ export default function EditCustomerForm({
             <option value="BOTH">Both</option>
           </select>
         </div>
+        {showMonitorOption && (
+          <div className="border border-slate-200 rounded-lg p-4 bg-slate-50 space-y-3">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={monitorChecked}
+                onChange={(e) => {
+                  setMonitorChecked(e.target.checked);
+                  if (!e.target.checked) setLinkedCustomerId("");
+                }}
+                className="rounded border-slate-300"
+              />
+              <span className="text-sm font-medium text-slate-700">Monitor (track usage, excluded from collection)</span>
+            </label>
+            {monitorChecked && (
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Linked customer (required) *</label>
+                <select
+                  value={linkedCustomerId}
+                  onChange={(e) => setLinkedCustomerId(e.target.value)}
+                  className="input"
+                  required
+                >
+                  <option value="">— Select customer —</option>
+                  {linkableCustomers.map((c) => (
+                    <option key={c.customerId} value={c.customerId}>
+                      {c.fullName} • {c.area} {c.building}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-slate-500 mt-1">Ampere customer whose line/meter this monitor uses.</p>
+              </div>
+            )}
+          </div>
+        )}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">

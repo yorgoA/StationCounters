@@ -49,6 +49,7 @@ function parseCustomer(r) {
     customerId: r[0],
     status: (r[10] || "ACTIVE").toUpperCase(),
     billingType: (r[8] || "").toUpperCase(),
+    isMonitor: r[15] === "true" || r[15] === "1",
   };
 }
 
@@ -82,9 +83,11 @@ async function main() {
   const customers = customerRows.map((r) => parseCustomer(r)).filter((c) => c.customerId);
 
   const freeIds = new Set(customers.filter((c) => c.billingType === "FREE").map((c) => c.customerId));
+  const monitorIds = new Set(customers.filter((c) => c.isMonitor).map((c) => c.customerId));
+  const excludedIds = new Set([...freeIds, ...monitorIds]);
   const monthBills = bills.filter((b) => b.monthKey === monthKey);
-  const payingBills = monthBills.filter((b) => !freeIds.has(b.customerId));
-  const allPayingBills = bills.filter((b) => !freeIds.has(b.customerId));
+  const payingBills = monthBills.filter((b) => !excludedIds.has(b.customerId));
+  const allPayingBills = bills.filter((b) => !excludedIds.has(b.customerId));
   const previousPayingBills = allPayingBills.filter((b) => b.monthKey < monthKey && b.remainingDue > 0);
 
   const totalBilled = payingBills.reduce((s, b) => s + b.totalDue, 0);

@@ -88,7 +88,7 @@ async function updateRow(sheetName: string, rowIndex: number, values: string[]) 
   await sheets.spreadsheets.values.update({
     spreadsheetId,
     range,
-    valueInputOption: "USER_ENTERED",
+    valueInputOption: "RAW",
     requestBody: { values: [values] },
   });
 }
@@ -114,9 +114,12 @@ export async function createCustomer(customer: Customer): Promise<void> {
 }
 
 export async function updateCustomer(customer: Customer): Promise<void> {
-  const rows = await getRange(SHEET_NAMES.CUSTOMERS);
-  const idx = rows.findIndex((r, i) => i > 0 && r[0] === customer.customerId);
-  if (idx === -1) throw new Error("Customer not found");
+  const rows = await getRange(SHEET_NAMES.CUSTOMERS, "A:Q");
+  const custId = String(customer.customerId || "").trim();
+  const idx = rows.findIndex(
+    (r, i) => i > 0 && String(r[0] ?? "").trim() === custId
+  );
+  if (idx === -1) throw new Error(`Customer not found: ${custId}`);
   await updateRow(SHEET_NAMES.CUSTOMERS, idx + 1, customerToRow(customer));
 }
 

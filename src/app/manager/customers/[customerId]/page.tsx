@@ -1,8 +1,9 @@
 export const dynamic = "force-dynamic";
 
+import { unstable_noStore } from "next/cache";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { getCustomerById, getBillsByCustomer, getAllPayments, getAmperePrices } from "@/lib/google-sheets";
+import { getCustomerById, getBillsByCustomer, getAllPayments, getAmperePrices, getAllCustomers } from "@/lib/google-sheets";
 import EditCustomerForm from "./EditCustomerForm";
 import BillingHistoryWithEdit from "./BillingHistoryWithEdit";
 
@@ -11,12 +12,14 @@ export default async function ManagerCustomerDetailPage({
 }: {
   params: Promise<{ customerId: string }>;
 }) {
+  unstable_noStore();
   const { customerId } = await params;
-  const [customer, bills, allPayments, ampereTiers] = await Promise.all([
+  const [customer, bills, allPayments, ampereTiers, allCustomers] = await Promise.all([
     getCustomerById(customerId),
     getBillsByCustomer(customerId),
     getAllPayments(),
     getAmperePrices(),
+    getAllCustomers(),
   ]);
 
   if (!customer) notFound();
@@ -50,7 +53,7 @@ export default async function ManagerCustomerDetailPage({
           <div className="bg-white rounded-lg border border-slate-200 p-6">
             <h2 className="font-semibold text-slate-800 mb-1">Edit Customer (Manager)</h2>
             <p className="text-xs text-slate-500 mb-4">Set active status, billing type (Free, Ampere, kWh), subscribed Ampere, discount.</p>
-            <EditCustomerForm customer={customer} ampereTiers={ampereTiers} />
+            <EditCustomerForm customer={customer} ampereTiers={ampereTiers} allCustomers={allCustomers} />
           </div>
         </div>
 

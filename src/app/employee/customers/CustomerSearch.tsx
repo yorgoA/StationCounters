@@ -118,13 +118,21 @@ export default function CustomerSearch({
                   </span>
                 </td>
                 <td className="px-4 py-3">
-                  {c.billingType === "FREE" ? (
-                    <span className="inline-flex px-2 py-0.5 text-xs font-medium rounded bg-sky-100 text-sky-800">
-                      Free
-                    </span>
-                  ) : (
-                    <span className="text-slate-500 text-xs">—</span>
-                  )}
+                  <div className="flex flex-wrap gap-1">
+                    {c.billingType === "FREE" && (
+                      <span className="inline-flex px-2 py-0.5 text-xs font-medium rounded bg-sky-100 text-sky-800">
+                        Free
+                      </span>
+                    )}
+                    {c.isMonitor && (
+                      <span className="inline-flex px-2 py-0.5 text-xs font-medium rounded bg-amber-100 text-amber-800">
+                        Monitor
+                      </span>
+                    )}
+                    {c.billingType !== "FREE" && !c.isMonitor && (
+                      <span className="text-slate-500 text-xs">—</span>
+                    )}
+                  </div>
                 </td>
                 <td className="px-4 py-3 text-right">
                   <Link

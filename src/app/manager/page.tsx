@@ -50,8 +50,12 @@ export default async function ManagerDashboardPage({
   const freeCustomerIds = new Set(
     customers.filter((c) => c.billingType === "FREE").map((c) => c.customerId)
   );
-  const allPayingBills = bills.filter((b) => !freeCustomerIds.has(b.customerId));
-  const payingBills = monthBills.filter((b) => !freeCustomerIds.has(b.customerId));
+  const monitorCustomerIds = new Set(
+    customers.filter((c) => c.isMonitor).map((c) => c.customerId)
+  );
+  const excludedFromBillingIds = new Set([...freeCustomerIds, ...monitorCustomerIds]);
+  const allPayingBills = bills.filter((b) => !excludedFromBillingIds.has(b.customerId));
+  const payingBills = monthBills.filter((b) => !excludedFromBillingIds.has(b.customerId));
   const previousPayingBills = allPayingBills.filter(
     (b) => b.monthKey < monthKey && b.remainingDue > 0
   );
@@ -67,6 +71,7 @@ export default async function ManagerDashboardPage({
 
   const totalAmpereBilled = payingBills.reduce((s, b) => s + b.ampereCharge, 0);
   const freeBillsThisMonth = monthBills.filter((b) => freeCustomerIds.has(b.customerId));
+  const monitorBillsThisMonth = monthBills.filter((b) => monitorCustomerIds.has(b.customerId));
   const customerMap = new Map(customers.map((c) => [c.customerId, c]));
   const ampereExpectedInclFree =
     totalAmpereBilled +
@@ -97,15 +102,35 @@ export default async function ManagerDashboardPage({
     new Map<string, typeof previousPayingBills>()
   );
 
-  const activeCustomers = customers.filter((c) => c.status === "ACTIVE");
+  const customersExclMonitors = customers.filter((c) => !c.isMonitor);
+  const activeCustomers = customersExclMonitors.filter((c) => c.status === "ACTIVE");
   const payingActiveCustomers = activeCustomers.filter(
-    (c) => c.billingType !== "FREE"
+    (c) => c.billingType !== "FREE" && !c.isMonitor
   );
   const freeCustomers = customers.filter((c) => c.billingType === "FREE");
   const customersWithReadings = new Set(monthBills.map((b) => b.customerId));
   const customersWithoutReading = payingActiveCustomers.filter(
     (c) => !customersWithReadings.has(c.customerId)
   );
+
+  const totalMonitorKwh = monitorBillsThisMonth.reduce((s, b) => s + b.usageKwh, 0);
+  const totalMonitorAmount = monitorBillsThisMonth.reduce((s, b) => {
+    const consumption = kwhPrice > 0 ? Math.round(b.usageKwh * kwhPrice) : b.consumptionCharge;
+    return s + consumption;
+  }, 0);
+  const monitorsWithBills = monitorBillsThisMonth.map((b) => {
+    const cust = customerMap.get(b.customerId);
+    const consumption = kwhPrice > 0 ? Math.round(b.usageKwh * kwhPrice) : b.consumptionCharge;
+    const amount = consumption;
+    return {
+      customerId: b.customerId,
+      fullName: cust?.fullName ?? b.customerId,
+      area: cust?.area ?? "",
+      building: cust?.building ?? "",
+      usageKwh: b.usageKwh,
+      amount,
+    };
+  });
 
   return (
     <div>
@@ -130,9 +155,10 @@ export default async function ManagerDashboardPage({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <div className="bg-white rounded-lg border border-slate-200 p-5">
           <p className="text-sm text-slate-500">Total Customers</p>
-          <p className="text-2xl font-bold text-slate-800">{customers.length}</p>
+          <p className="text-2xl font-bold text-slate-800">{customersExclMonitors.length}</p>
           <p className="text-xs text-slate-400 mt-1">
-            {activeCustomers.length} active · {customers.length - activeCustomers.length} inactive
+            {activeCustomers.length} active · {customersExclMonitors.length - activeCustomers.length} inactive
+            {monitorCustomerIds.size > 0 && ` · ${monitorCustomerIds.size} monitors`}
           </p>
         </div>
         <div className="bg-white rounded-lg border border-slate-200 p-5">
@@ -235,6 +261,82 @@ export default async function ManagerDashboardPage({
           </div>
         </div>
       </div>
+
+      {/* Monitors (AMPERE_ONLY, tracked but not collected) */}
+      {monitorCustomerIds.size > 0 && (
+        <div className="bg-white rounded-lg border border-slate-200 p-6 mb-8">
+          <h2 className="font-semibold text-slate-800 mb-4">
+            Monitors ({formatMonthKey(monthKey)})
+          </h2>
+          <p className="text-sm text-slate-500 mb-4">
+            kWh customers (KWH_ONLY/BOTH) tracked for usage. Excluded from payment collection.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <div>
+              <p className="text-sm text-slate-500">Monitors count</p>
+              <p className="text-xl font-bold text-slate-800">{monitorCustomerIds.size}</p>
+            </div>
+            <div>
+              <p className="text-sm text-slate-500">Total kWh (this month)</p>
+              <p className="text-xl font-bold text-slate-800">
+                {totalMonitorKwh.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-slate-500">Total amount (not collected)</p>
+              <p className="text-xl font-bold text-slate-800">
+                {totalMonitorAmount.toLocaleString()} LBP
+              </p>
+            </div>
+          </div>
+          {monitorsWithBills.length > 0 ? (
+            <div>
+              <h3 className="font-medium text-slate-700 mb-2">Monitor list</h3>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-slate-200">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase">Customer</th>
+                      <th className="px-4 py-2 text-right text-xs font-medium text-slate-500 uppercase">kWh</th>
+                      <th className="px-4 py-2 text-right text-xs font-medium text-slate-500 uppercase">Amount (LBP)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {monitorsWithBills.map((m) => (
+                      <tr key={m.customerId} className="hover:bg-slate-50">
+                        <td className="px-4 py-2">
+                          <Link
+                            href={`/manager/customers/${m.customerId}`}
+                            className="text-slate-700 hover:text-primary-600 font-medium"
+                          >
+                            {m.fullName}
+                          </Link>
+                          {(m.area || m.building) && (
+                            <p className="text-xs text-slate-500">{m.area} {m.building}</p>
+                          )}
+                        </td>
+                        <td className="px-4 py-2 text-right text-slate-700">
+                          {m.usageKwh.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                        </td>
+                        <td className="px-4 py-2 text-right font-medium text-slate-800">
+                          {m.amount.toLocaleString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {monitorCustomerIds.size > monitorsWithBills.length && (
+                <p className="text-xs text-slate-500 mt-2">
+                  {monitorCustomerIds.size - monitorsWithBills.length} monitor(s) without reading this month
+                </p>
+              )}
+            </div>
+          ) : (
+            <p className="text-slate-500">No monitor readings for this month.</p>
+          )}
+        </div>
+      )}
 
       {/* Unpaid breakdown: this month + previous months */}
       <div className="bg-white rounded-lg border border-slate-200 p-6 mb-8">
