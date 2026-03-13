@@ -92,7 +92,7 @@ Edit `.env.local` with:
 Create a Google Sheet with these tabs and headers (exact order matters):
 
 **Tab: Customers**
-- Row 1: `customerId`, `fullName`, `phone`, `area` (box number), `building`, `floor`, `apartmentNumber`, `subscribedAmpere`, `billingType`, `fixedDiscountAmount`, `status`, `notes`, `createdAt`
+- Row 1: `customerId`, `fullName`, `phone`, `area` (box number), `building`, `floor`, `apartmentNumber`, `subscribedAmpere`, `billingType`, `fixedDiscountAmount`, `status`, `notes`, `createdAt`, `freeReason`, `fixedDiscountPercent`
 
 **Tab: Bills**
 - Row 1: `billId`, `customerId`, `monthKey`, `previousCounter`, `currentCounter`, `usageKwh`, `amperePriceSnapshot`, `kwhPriceSnapshot`, `ampereCharge`, `consumptionCharge`, `discountApplied`, `previousUnpaidBalance`, `totalDue`, `totalPaid`, `remainingDue`, `paymentStatus`, `createdAt`, `updatedAt`

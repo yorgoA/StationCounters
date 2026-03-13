@@ -5,6 +5,15 @@ import { useRouter } from "next/navigation";
 import { createCustomerAction } from "@/app/actions/customer";
 import type { AmperePriceTier, BillingType } from "@/types";
 
+function getDiscountValues(
+  amount: number,
+  percent: number
+): { fixedDiscountAmount: number; fixedDiscountPercent: number } {
+  if (amount > 0) return { fixedDiscountAmount: amount, fixedDiscountPercent: 0 };
+  if (percent > 0) return { fixedDiscountAmount: 0, fixedDiscountPercent: percent };
+  return { fixedDiscountAmount: 0, fixedDiscountPercent: 0 };
+}
+
 export default function AddCustomerForm({
   basePath = "/employee/customers",
   ampereTiers,
@@ -23,6 +32,10 @@ export default function AddCustomerForm({
     const form = e.currentTarget;
     const data = new FormData(form);
 
+    const discountAmt = Number(data.get("fixedDiscountAmount")) || 0;
+    const discountPct = Number(data.get("fixedDiscountPercent")) || 0;
+    const discount = getDiscountValues(discountAmt, discountPct);
+
     const result = await createCustomerAction({
       fullName: data.get("fullName") as string,
       phone: data.get("phone") as string,
@@ -32,7 +45,7 @@ export default function AddCustomerForm({
       apartmentNumber: data.get("apartmentNumber") as string,
       subscribedAmpere: Number(data.get("subscribedAmpere")) || 0,
       billingType: (data.get("billingType") as BillingType) || "BOTH",
-      fixedDiscountAmount: Number(data.get("fixedDiscountAmount")) || 0,
+      ...discount,
       status: "ACTIVE",
       notes: (data.get("notes") as string) || "",
     });
@@ -100,8 +113,35 @@ export default function AddCustomerForm({
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Fixed Discount (LBP)</label>
-          <input name="fixedDiscountAmount" type="number" step="0.01" defaultValue={0} placeholder="e.g. 5000" className="input" />
+          <label className="block text-sm font-medium text-slate-700 mb-1">
+            Fixed Discount (LBP)
+          </label>
+          <input
+            name="fixedDiscountAmount"
+            type="number"
+            step="0.01"
+            defaultValue={0}
+            placeholder="e.g. 5000"
+            className="input"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">
+            Fixed Discount (%)
+          </label>
+          <input
+            name="fixedDiscountPercent"
+            type="number"
+            step="0.01"
+            min={0}
+            max={100}
+            defaultValue={0}
+            placeholder="e.g. 10"
+            className="input"
+          />
+        </div>
+        <div className="md:col-span-2">
+          <p className="text-xs text-slate-500">Use fixed amount (LBP) or percentage, not both.</p>
         </div>
         <div className="md:col-span-2">
           <label className="block text-sm font-medium text-slate-700 mb-1">Notes</label>

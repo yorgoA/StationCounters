@@ -25,7 +25,10 @@ export default function EditCustomerForm({
       : "BOTH"
   );
   const [fixedDiscountAmount, setFixedDiscountAmount] = useState(
-    String(customer.fixedDiscountAmount)
+    String(customer.fixedDiscountAmount || "")
+  );
+  const [fixedDiscountPercent, setFixedDiscountPercent] = useState(
+    String(customer.fixedDiscountPercent || "")
   );
 
   const effectiveBillingType = freeChecked ? "FREE" : billingType;
@@ -34,11 +37,15 @@ export default function EditCustomerForm({
     e.preventDefault();
     setError("");
     setLoading(true);
+    const amt = parseFloat(fixedDiscountAmount) || 0;
+    const pct = parseFloat(fixedDiscountPercent) || 0;
+    const useAmount = amt > 0;
     const result = await updateCustomerAction({
       ...customer,
       subscribedAmpere,
       billingType: effectiveBillingType,
-      fixedDiscountAmount: parseFloat(fixedDiscountAmount) || 0,
+      fixedDiscountAmount: useAmount ? amt : 0,
+      fixedDiscountPercent: useAmount ? 0 : pct,
       freeReason: freeChecked ? freeReason : "",
     });
     setLoading(false);
@@ -89,6 +96,7 @@ export default function EditCustomerForm({
         )}
       </div>
       {!freeChecked && (
+        <>
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">Billing Type</label>
           <select
@@ -101,18 +109,45 @@ export default function EditCustomerForm({
             <option value="BOTH">Both</option>
           </select>
         </div>
-      )}
-      <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1">Fixed Discount (LBP)</label>
-        <input
-          type="number"
-          step="0.01"
-          value={fixedDiscountAmount}
-          onChange={(e) => setFixedDiscountAmount(e.target.value)}
-          placeholder="e.g. 5000"
-          className="input"
-        />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">
+            Fixed Discount (LBP)
+          </label>
+          <input
+            type="number"
+            step="0.01"
+            value={fixedDiscountAmount}
+            onChange={(e) => {
+              setFixedDiscountAmount(e.target.value);
+              if (e.target.value && parseFloat(e.target.value) > 0) setFixedDiscountPercent("");
+            }}
+            placeholder="e.g. 5000"
+            className="input"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">
+            Fixed Discount (%)
+          </label>
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            max="100"
+            value={fixedDiscountPercent}
+            onChange={(e) => {
+              setFixedDiscountPercent(e.target.value);
+              if (e.target.value && parseFloat(e.target.value) > 0) setFixedDiscountAmount("");
+            }}
+            placeholder="e.g. 10"
+            className="input"
+          />
+        </div>
       </div>
+      <p className="text-xs text-slate-500">Use one or the other (amount or percentage), not both.</p>
+        </>
+      )}
       {error && <p className="text-red-600 text-sm">{error}</p>}
       <button type="submit" disabled={loading} className="btn-primary">
         {loading ? "Saving..." : "Save Changes"}

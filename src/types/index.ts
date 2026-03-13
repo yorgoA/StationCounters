@@ -27,6 +27,7 @@ export interface Customer {
   subscribedAmpere: number;
   billingType: BillingType;
   fixedDiscountAmount: number;
+  fixedDiscountPercent: number; // 0–100; mutually exclusive with fixedDiscountAmount
   status: CustomerStatus;
   notes: string;
   createdAt: string;
@@ -43,6 +44,7 @@ export interface CreateCustomerInput {
   subscribedAmpere: number;
   billingType: BillingType;
   fixedDiscountAmount?: number;
+  fixedDiscountPercent?: number;
   status?: CustomerStatus;
   notes?: string;
 }

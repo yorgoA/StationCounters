@@ -27,6 +27,7 @@ export async function createCustomerAction(input: CreateCustomerInput) {
     subscribedAmpere: input.subscribedAmpere,
     billingType: input.billingType,
     fixedDiscountAmount: input.fixedDiscountAmount ?? 0,
+    fixedDiscountPercent: input.fixedDiscountPercent ?? 0,
     status: input.status ?? "ACTIVE",
     notes: input.notes ?? "",
     createdAt: new Date().toISOString(),

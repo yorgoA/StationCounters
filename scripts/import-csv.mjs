@@ -138,6 +138,7 @@ function csvRowToCustomerAndBill(row, monthKey) {
     subscribedAmpere: subscribedAmpere || 10,
     billingType,
     fixedDiscountAmount: 0,
+    fixedDiscountPercent: 0,
     status: "ACTIVE",
     notes: "",
     createdAt: now,
@@ -358,6 +359,7 @@ async function main() {
     "notes",
     "createdAt",
     "freeReason",
+    "fixedDiscountPercent",
   ];
 
   const values = [headerRow, ...customers.map(customerToRow)];

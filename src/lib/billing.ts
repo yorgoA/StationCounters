@@ -55,12 +55,31 @@ export function calcTotalBeforeDiscount(
   return ampereCharge + consumptionCharge + previousUnpaidBalance;
 }
 
+/** Compute effective discount: amount takes precedence over percent (mutually exclusive) */
+export function calcEffectiveDiscount(
+  totalBeforeDiscount: number,
+  fixedDiscountAmount: number,
+  fixedDiscountPercent: number
+): number {
+  if (fixedDiscountAmount > 0) return Math.min(fixedDiscountAmount, totalBeforeDiscount);
+  if (fixedDiscountPercent > 0) {
+    const byPercent = Math.round(totalBeforeDiscount * (fixedDiscountPercent / 100));
+    return Math.min(byPercent, totalBeforeDiscount);
+  }
+  return 0;
+}
+
 export function calcTotalAfterDiscount(
   totalBeforeDiscount: number,
-  fixedDiscountAmount: number
+  fixedDiscountAmount: number,
+  fixedDiscountPercent: number = 0
 ): number {
-  const total = totalBeforeDiscount - fixedDiscountAmount;
-  return Math.max(0, total); // Never negative
+  const discount = calcEffectiveDiscount(
+    totalBeforeDiscount,
+    fixedDiscountAmount,
+    fixedDiscountPercent
+  );
+  return Math.max(0, totalBeforeDiscount - discount);
 }
 
 export function calcPaymentStatus(
@@ -80,6 +99,7 @@ export function calcBillFromReadings(
   subscribedAmpere: number,
   billingType: BillingType,
   fixedDiscountAmount: number,
+  fixedDiscountPercent: number,
   ampereTiers: AmperePriceTier[],
   kwhPrice: number,
   previousUnpaidBalance: number
@@ -112,8 +132,16 @@ export function calcBillFromReadings(
     consumptionCharge,
     previousUnpaidBalance
   );
-  const discountApplied = Math.min(fixedDiscountAmount, totalBeforeDiscount);
-  const totalDue = calcTotalAfterDiscount(totalBeforeDiscount, fixedDiscountAmount);
+  const discountApplied = calcEffectiveDiscount(
+    totalBeforeDiscount,
+    fixedDiscountAmount,
+    fixedDiscountPercent
+  );
+  const totalDue = calcTotalAfterDiscount(
+    totalBeforeDiscount,
+    fixedDiscountAmount,
+    fixedDiscountPercent
+  );
   const totalPaid = 0;
   const remainingDue = totalDue;
   const paymentStatus = calcPaymentStatus(totalPaid, remainingDue);

@@ -59,7 +59,8 @@ export async function createBillAction(input: CreateBillInput) {
     input.currentCounter,
     customer.subscribedAmpere,
     customer.billingType,
-    customer.fixedDiscountAmount,
+    customer.fixedDiscountAmount ?? 0,
+    customer.fixedDiscountPercent ?? 0,
     ampereTiers,
     settings.kwhPrice,
     previousUnpaid
@@ -114,7 +115,8 @@ export async function updateBillReadingsAction(input: UpdateBillReadingsInput) {
     input.currentCounter,
     customer.subscribedAmpere,
     customer.billingType,
-    customer.fixedDiscountAmount,
+    customer.fixedDiscountAmount ?? 0,
+    customer.fixedDiscountPercent ?? 0,
     ampereTiers,
     settings.kwhPrice,
     previousUnpaid

@@ -22,6 +22,10 @@ export async function createPaymentAction(input: CreatePaymentInput) {
     return { error: "Unauthorized" };
   }
 
+  if (!input.receiptImageUrl?.trim()) {
+    return { error: "Receipt is required" };
+  }
+
   const bill = await getBillByIdInternal(input.billId);
   if (!bill) {
     return { error: "Bill not found" };

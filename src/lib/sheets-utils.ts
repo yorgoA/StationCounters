@@ -17,6 +17,7 @@ export function rowToCustomer(row: string[]): Customer {
     subscribedAmpere: parseFloat(r[7] || "0") || 0,
     billingType: (r[8] || "BOTH") as Customer["billingType"],
     fixedDiscountAmount: parseFloat(r[9] || "0") || 0,
+    fixedDiscountPercent: parseFloat(r[14] || "0") || 0,
     status: (r[10] || "ACTIVE") as Customer["status"],
     notes: r[11] || "",
     createdAt: r[12] || new Date().toISOString(),
@@ -40,6 +41,7 @@ export function customerToRow(c: Customer): string[] {
     c.notes,
     c.createdAt,
     c.freeReason ?? "",
+    String(c.fixedDiscountPercent ?? 0),
   ];
 }
 

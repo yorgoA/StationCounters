@@ -33,7 +33,11 @@ export default async function EmployeeCustomerDetailPage({
             {customer.area} • {customer.building} • Floor {customer.floor} • Apt {customer.apartmentNumber}
           </p>
           <p className="text-slate-500 text-sm mt-1">
-            {customer.subscribedAmpere}A • {customer.billingType} • Discount: {customer.fixedDiscountAmount} LBP •{" "}
+            {customer.subscribedAmpere}A • {customer.billingType} • Discount: {customer.fixedDiscountAmount > 0
+              ? `${customer.fixedDiscountAmount.toLocaleString()} LBP`
+              : (customer.fixedDiscountPercent ?? 0) > 0
+              ? `${customer.fixedDiscountPercent}%`
+              : "—"} •{" "}
             <span className={customer.status === "ACTIVE" ? "text-green-600" : "text-slate-500"}>{customer.status}</span>
           </p>
           <details className="mt-4 pt-4 border-t border-slate-100">

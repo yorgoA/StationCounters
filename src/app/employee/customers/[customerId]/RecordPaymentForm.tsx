@@ -44,12 +44,18 @@ export default function RecordPaymentForm({
       return;
     }
 
+    if (!receiptUrl) {
+      setError("Receipt is required. Please upload a photo.");
+      setLoading(false);
+      return;
+    }
+
     const result = await createPaymentAction({
       billId,
       customerId,
       paymentDate: (data.get("paymentDate") as string) || formatDate(new Date()),
       amountPaid: Number(data.get("amountPaid")) || 0,
-      receiptImageUrl: receiptUrl || undefined,
+      receiptImageUrl: receiptUrl,
       paymentMethod: (data.get("paymentMethod") as string) || "CASH",
       note: (data.get("note") as string) || "",
       enteredByRole: "employee",
@@ -104,10 +110,11 @@ export default function RecordPaymentForm({
         </select>
       </div>
       <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1">Receipt (recommended)</label>
+        <label className="block text-sm font-medium text-slate-700 mb-1">Receipt *</label>
         <input
           type="file"
           accept="image/*"
+          capture="environment"
           onChange={handleReceiptUpload}
           className="block w-full text-sm text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
         />
@@ -118,7 +125,7 @@ export default function RecordPaymentForm({
         <input name="note" className="input" placeholder="Optional" />
       </div>
       {error && <p className="text-red-600 text-sm">{error}</p>}
-      <button type="submit" disabled={loading} className="btn-primary">
+      <button type="submit" disabled={loading || !receiptUrl} className="btn-primary">
         {loading ? "Recording..." : "Record Payment"}
       </button>
     </form>

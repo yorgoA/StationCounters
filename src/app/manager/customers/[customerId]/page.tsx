@@ -39,7 +39,11 @@ export default async function ManagerCustomerDetailPage({
               {customer.area} • {customer.building} • Floor {customer.floor} • Apt {customer.apartmentNumber}
             </p>
             <p className="text-slate-500 text-sm mt-1">
-              {customer.subscribedAmpere}A • {customer.billingType} • Discount: {customer.fixedDiscountAmount} LBP
+              {customer.subscribedAmpere}A • {customer.billingType} • Discount: {customer.fixedDiscountAmount > 0
+                ? `${customer.fixedDiscountAmount.toLocaleString()} LBP`
+                : customer.fixedDiscountPercent > 0
+                ? `${customer.fixedDiscountPercent}%`
+                : "—"}
             </p>
           </div>
 
