@@ -28,6 +28,7 @@ export function calcAmpereCharge(
   tiers: AmperePriceTier[],
   billingType: BillingType
 ): number {
+  if (billingType === "FREE") return 0;
   if (billingType === "AMPERE_ONLY" || billingType === "BOTH") {
     return getAmperePriceForTier(subscribedAmpere, tiers);
   }
@@ -39,6 +40,7 @@ export function calcConsumptionCharge(
   kwhPrice: number,
   billingType: BillingType
 ): number {
+  if (billingType === "FREE") return 0;
   if (billingType === "KWH_ONLY" || billingType === "BOTH") {
     return usageKwh * kwhPrice;
   }
@@ -83,6 +85,26 @@ export function calcBillFromReadings(
   previousUnpaidBalance: number
 ): Omit<Bill, "billId" | "createdAt" | "updatedAt"> {
   const usageKwh = calcUsageKwh(previousCounter, currentCounter);
+  // Free customers: bill is always 0
+  if (billingType === "FREE") {
+    return {
+      customerId,
+      monthKey,
+      previousCounter,
+      currentCounter,
+      usageKwh,
+      amperePriceSnapshot: 0,
+      kwhPriceSnapshot: kwhPrice,
+      ampereCharge: 0,
+      consumptionCharge: 0,
+      discountApplied: 0,
+      previousUnpaidBalance: 0,
+      totalDue: 0,
+      totalPaid: 0,
+      remainingDue: 0,
+      paymentStatus: "PAID",
+    };
+  }
   const ampereCharge = calcAmpereCharge(subscribedAmpere, ampereTiers, billingType);
   const consumptionCharge = calcConsumptionCharge(usageKwh, kwhPrice, billingType);
   const totalBeforeDiscount = calcTotalBeforeDiscount(

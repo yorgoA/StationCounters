@@ -58,6 +58,7 @@ export default async function EmployeeCustomerDetailPage({
                   <th className="pb-2">Paid</th>
                   <th className="pb-2">Remaining</th>
                   <th className="pb-2">Status</th>
+                  <th className="pb-2"></th>
                 </tr>
               </thead>
               <tbody>
@@ -80,6 +81,14 @@ export default async function EmployeeCustomerDetailPage({
                       >
                         {b.paymentStatus}
                       </span>
+                    </td>
+                    <td className="py-2">
+                      <Link
+                        href={`/employee/bill/${b.billId}`}
+                        className="text-primary-600 hover:text-primary-700 text-sm font-medium"
+                      >
+                        Print
+                      </Link>
                     </td>
                   </tr>
                 ))}

@@ -93,6 +93,7 @@ export default function AddCustomerForm({
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">Billing Type</label>
           <select name="billingType" className="input" defaultValue="BOTH">
+            <option value="FREE">Free (no charge)</option>
             <option value="AMPERE_ONLY">Ampere Only</option>
             <option value="KWH_ONLY">kWh Only</option>
             <option value="BOTH">Both</option>

@@ -49,6 +49,11 @@ export default function RecordReadingForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {customer.billingType === "FREE" && (
+        <p className="text-sm text-sky-600 bg-sky-50 px-3 py-2 rounded-lg">
+          Free customer: bill will be 0 LBP. Counter readings are still recorded.
+        </p>
+      )}
       {customer.billingType === "AMPERE_ONLY" && (
         <p className="text-sm text-slate-500 bg-slate-50 px-3 py-2 rounded-lg">
           Ampere-only customers are not charged for kWh, but we still record counter readings to monitor for anomalies.

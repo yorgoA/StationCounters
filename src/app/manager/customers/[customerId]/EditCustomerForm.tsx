@@ -62,6 +62,7 @@ export default function EditCustomerForm({
           onChange={(e) => setBillingType(e.target.value as BillingType)}
           className="input"
         >
+          <option value="FREE">Free (no charge)</option>
           <option value="AMPERE_ONLY">Ampere Only</option>
           <option value="KWH_ONLY">kWh Only</option>
           <option value="BOTH">Both</option>

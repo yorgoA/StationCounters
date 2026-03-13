@@ -13,7 +13,7 @@ export interface SessionUser {
 // CUSTOMERS
 // =============================================================================
 
-export type BillingType = "AMPERE_ONLY" | "KWH_ONLY" | "BOTH";
+export type BillingType = "AMPERE_ONLY" | "KWH_ONLY" | "BOTH" | "FREE";
 export type CustomerStatus = "ACTIVE" | "INACTIVE";
 
 export interface Customer {

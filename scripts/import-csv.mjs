@@ -9,9 +9,9 @@
  * If (Total Price - Paid till now) = 0 → PAID.
  *
  * Usage:
- *   npm run import-csv -- 2025-02              # FILE.csv, February 2025
- *   npm run import-csv -- "FILE 2.csv" 2025-02 # custom file + month
- *   IMPORT_MONTH=2025-02 npm run import-csv -- "FILE 2.csv"
+ *   npm run import-csv -- 2025-02                    # FILE.csv, February 2025
+ *   npm run import-csv -- "FILE 2.csv" 2025-02       # custom file + month
+ *   npm run import-csv -- "FILE 2.csv" 2025-02 --clear  # clear Customers/Bills/Payments first, then import (fixes double imports)
  */
 
 import { readFileSync } from "fs";
@@ -42,10 +42,11 @@ function loadEnv() {
 
 loadEnv();
 
-// Parse CLI args: [filePath?, month?]
+// Parse CLI args: [filePath?, month?] [, --clear]
 function getArgs() {
   const a = process.argv[2];
   const b = process.argv[3];
+  const clearFirst = process.argv.includes("--clear");
   let csvFile = "FILE.csv";
   let monthKey = process.env.IMPORT_MONTH;
   if (a && a.endsWith(".csv")) {
@@ -58,7 +59,7 @@ function getArgs() {
     const now = new Date();
     monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   }
-  return { csvFile, monthKey };
+  return { csvFile, monthKey, clearFirst };
 }
 
 function parseCSVLine(line) {
@@ -199,7 +200,7 @@ function billToRow(b) {
 }
 
 async function main() {
-  const { csvFile, monthKey } = getArgs();
+  const { csvFile, monthKey, clearFirst } = getArgs();
   const csvPath = resolve(projectRoot, csvFile);
   const credPath =
     process.env.GOOGLE_APPLICATION_CREDENTIALS ||
@@ -247,6 +248,28 @@ async function main() {
 
   const sheets = google.sheets({ version: "v4", auth });
 
+  if (clearFirst) {
+    console.log("Clearing Customers, Bills, Payments...");
+    for (const sheetName of ["Customers", "Bills", "Payments"]) {
+      try {
+        const res = await sheets.spreadsheets.values.get({
+          spreadsheetId,
+          range: `${sheetName}!A:Z`,
+        });
+        const rows = res.data.values || [];
+        if (rows.length > 1) {
+          await sheets.spreadsheets.values.clear({
+            spreadsheetId,
+            range: `${sheetName}!A2:Z`,
+          });
+          console.log(`  Cleared ${sheetName} (${rows.length - 1} rows)`);
+        }
+      } catch (err) {
+        console.warn(`  ${sheetName}: ${err.message}`);
+      }
+    }
+  }
+
   // Batch append (Sheets API allows up to ~10MB per request; 400 rows is fine)
   const headerRow = [
     "customerId",
@@ -272,7 +295,7 @@ async function main() {
     spreadsheetId,
     range: "Customers!A:A",
   });
-  const existingRows = (res.data.values || []).length;
+  const existingRows = clearFirst ? 0 : (res.data.values || []).length;
 
   if (existingRows === 0) {
     await sheets.spreadsheets.values.update({
@@ -306,7 +329,7 @@ async function main() {
     spreadsheetId,
     range: "Bills!A:A",
   });
-  const existingBillsRows = (billsRes.data.values || []).length;
+  const existingBillsRows = clearFirst ? 0 : (billsRes.data.values || []).length;
 
   if (existingBillsRows === 0) {
     await sheets.spreadsheets.values.update({
