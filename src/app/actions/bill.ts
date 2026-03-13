@@ -7,6 +7,7 @@ import {
   createBill as dbCreateBill,
   updateBill as dbUpdateBill,
   getBillsByCustomer,
+  getAllBills,
   getSettings,
   getAmperePrices,
   getCustomerById,

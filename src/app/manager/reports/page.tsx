@@ -31,8 +31,8 @@ export default async function ManagerReportsPage() {
   }
 
   const allMonths = new Set([
-    ...monthBills.keys(),
-    ...monthPayments.keys(),
+    ...Array.from(monthBills.keys()),
+    ...Array.from(monthPayments.keys()),
   ]);
   const sortedMonths = Array.from(allMonths).sort().reverse();
 
