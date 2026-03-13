@@ -198,7 +198,13 @@ export default async function ManagerDashboardPage({
         <h2 className="font-semibold text-slate-800 mb-4">
           With Free ({formatMonthKey(monthKey)}) — Paying only
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+          <div>
+            <p className="text-sm text-slate-500">kWh (this month)</p>
+            <p className="text-xl font-bold text-slate-800">
+              {totalKwhPaying.toLocaleString()} kWh
+            </p>
+          </div>
           <div>
             <p className="text-sm text-slate-500">From Ampere</p>
             <p className="text-xl font-bold text-slate-800">
@@ -209,9 +215,6 @@ export default async function ManagerDashboardPage({
             <p className="text-sm text-slate-500">From Consumption (kWh)</p>
             <p className="text-xl font-bold text-slate-800">
               {totalConsumptionBilled.toLocaleString()} LBP
-            </p>
-            <p className="text-xs text-slate-400 mt-1">
-              {totalKwhPaying.toLocaleString()} kWh
             </p>
           </div>
           <div>
@@ -234,7 +237,13 @@ export default async function ManagerDashboardPage({
         <h2 className="font-semibold text-slate-800 mb-4">
           If Free Charged ({formatMonthKey(monthKey)}) — All customers
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+          <div>
+            <p className="text-sm text-slate-500">kWh (this month)</p>
+            <p className="text-xl font-bold text-slate-800">
+              {totalKwhInclFree.toLocaleString()} kWh
+            </p>
+          </div>
           <div>
             <p className="text-sm text-slate-500">From Ampere</p>
             <p className="text-xl font-bold text-slate-800">
@@ -245,9 +254,6 @@ export default async function ManagerDashboardPage({
             <p className="text-sm text-slate-500">From Consumption (kWh)</p>
             <p className="text-xl font-bold text-slate-800">
               {consumptionExpectedInclFree.toLocaleString()} LBP
-            </p>
-            <p className="text-xs text-slate-400 mt-1">
-              {totalKwhInclFree.toLocaleString()} kWh
             </p>
           </div>
           <div>
