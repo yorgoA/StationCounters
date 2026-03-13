@@ -30,6 +30,7 @@ export default function EditCustomerForm({
   const [fixedDiscountPercent, setFixedDiscountPercent] = useState(
     String(customer.fixedDiscountPercent || "")
   );
+  const [activeChecked, setActiveChecked] = useState(customer.status === "ACTIVE");
 
   const effectiveBillingType = freeChecked ? "FREE" : billingType;
 
@@ -47,6 +48,7 @@ export default function EditCustomerForm({
       fixedDiscountAmount: useAmount ? amt : 0,
       fixedDiscountPercent: useAmount ? 0 : pct,
       freeReason: freeChecked ? freeReason : "",
+      status: activeChecked ? "ACTIVE" : "INACTIVE",
     });
     setLoading(false);
     if (result.error) {
@@ -71,6 +73,18 @@ export default function EditCustomerForm({
             </option>
           ))}
         </select>
+      </div>
+      <div>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={activeChecked}
+            onChange={(e) => setActiveChecked(e.target.checked)}
+            className="rounded border-slate-300"
+          />
+          <span className="text-sm font-medium text-slate-700">Active customer</span>
+        </label>
+        <p className="text-xs text-slate-500 mt-0.5">Inactive customers are excluded from Record Reading and Missing readings. Past bills remain.</p>
       </div>
       <div>
         <label className="flex items-center gap-2 cursor-pointer">

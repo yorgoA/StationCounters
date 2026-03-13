@@ -121,7 +121,7 @@ export default async function ManagerDashboardPage({
           <p className="text-sm text-slate-500">Total Customers</p>
           <p className="text-2xl font-bold text-slate-800">{customers.length}</p>
           <p className="text-xs text-slate-400 mt-1">
-            {payingActiveCustomers.length} paying · {freeCustomers.length} free
+            {activeCustomers.length} active · {customers.length - activeCustomers.length} inactive
           </p>
         </div>
         <div className="bg-white rounded-lg border border-slate-200 p-5">

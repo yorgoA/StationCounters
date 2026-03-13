@@ -39,7 +39,7 @@ export default async function ManagerCustomerDetailPage({
               {customer.area} • {customer.building} • Floor {customer.floor} • Apt {customer.apartmentNumber}
             </p>
             <p className="text-slate-500 text-sm mt-1">
-              {customer.subscribedAmpere}A • {customer.billingType} • Discount: {customer.fixedDiscountAmount > 0
+              {customer.subscribedAmpere}A • {customer.billingType} • {customer.status} • Discount: {customer.fixedDiscountAmount > 0
                 ? `${customer.fixedDiscountAmount.toLocaleString()} LBP`
                 : customer.fixedDiscountPercent > 0
                 ? `${customer.fixedDiscountPercent}%`
@@ -49,7 +49,7 @@ export default async function ManagerCustomerDetailPage({
 
           <div className="bg-white rounded-lg border border-slate-200 p-6">
             <h2 className="font-semibold text-slate-800 mb-1">Edit Customer (Manager)</h2>
-            <p className="text-xs text-slate-500 mb-4">Set billing type (Free, Ampere, kWh), subscribed Ampere, discount.</p>
+            <p className="text-xs text-slate-500 mb-4">Set active status, billing type (Free, Ampere, kWh), subscribed Ampere, discount.</p>
             <EditCustomerForm customer={customer} ampereTiers={ampereTiers} />
           </div>
         </div>
