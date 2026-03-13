@@ -88,8 +88,8 @@ export default function CustomerSearch({
           </label>
         )}
       </div>
-      <div className="bg-white rounded-lg border border-slate-200 overflow-hidden mt-4">
-        <table className="min-w-full divide-y divide-slate-200">
+      <div className="bg-white rounded-lg border border-slate-200 overflow-x-auto mt-4">
+        <table className="min-w-[640px] w-full divide-y divide-slate-200">
           <thead className="bg-slate-50">
             <tr>
               <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Name</th>
