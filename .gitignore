@@ -30,8 +30,5 @@ yarn-error.log*
 
 # Google / service account credentials
 *-credentials.json
-credentials.json
-*.json
-
-*-credentials.json
 *credentials*.json
+station-*.json
