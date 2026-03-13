@@ -3,10 +3,19 @@ export const dynamic = "force-dynamic";
 import { getAllCustomers } from "@/lib/google-sheets";
 import { getAllBills } from "@/lib/google-sheets";
 import Link from "next/link";
+import DashboardMonthSelect from "./DashboardMonthSelect";
 
 function getCurrentMonthKey() {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function getPreviousMonthKey() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth();
+  const prev = m === 0 ? new Date(y - 1, 11) : new Date(y, m - 1);
+  return `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}`;
 }
 
 function formatMonthKey(monthKey: string) {
@@ -15,14 +24,26 @@ function formatMonthKey(monthKey: string) {
   return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
 }
 
-export default async function ManagerDashboardPage() {
+export default async function ManagerDashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ month?: string }>;
+}) {
+  const params = await searchParams;
   const [customers, bills] = await Promise.all([
     getAllCustomers(),
     getAllBills(),
   ]);
 
-  const monthKey = getCurrentMonthKey();
+  // Default to previous month (billing period - you collect for Feb during March)
+  const monthKey = params.month || getPreviousMonthKey();
   const monthBills = bills.filter((b) => b.monthKey === monthKey);
+
+  const billMonths = Array.from(new Set(bills.map((b) => b.monthKey)));
+  const currentKey = getCurrentMonthKey();
+  const previousKey = getPreviousMonthKey();
+  const allMonths = new Set([...billMonths, currentKey, previousKey]);
+  const months = Array.from(allMonths).sort().reverse();
 
   const totalBilled = monthBills.reduce((s, b) => s + b.totalDue, 0);
   const totalCollected = monthBills.reduce((s, b) => s + b.totalPaid, 0);
@@ -49,12 +70,22 @@ export default async function ManagerDashboardPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-slate-800 mb-6">
-        Manager Dashboard
-      </h1>
-      <p className="text-slate-500 mb-8">
-        Overview for {formatMonthKey(monthKey)}
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800">
+            Manager Dashboard
+          </h1>
+          <p className="text-slate-500 mt-1">
+            Overview for {formatMonthKey(monthKey)}
+          </p>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-600 mb-1">
+            View month
+          </label>
+          <DashboardMonthSelect months={months} currentMonth={monthKey} />
+        </div>
+      </div>
 
       {/* Top row: counts and money */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -70,14 +101,18 @@ export default async function ManagerDashboardPage() {
           <p className="text-2xl font-bold text-slate-800">
             {totalBilled.toLocaleString()}
           </p>
-          <p className="text-xs text-slate-400 mt-1">Invoiced this month (LBP)</p>
+          <p className="text-xs text-slate-400 mt-1">
+            Billed for {formatMonthKey(monthKey)} (LBP)
+          </p>
         </div>
         <div className="bg-white rounded-lg border border-slate-200 p-5">
           <p className="text-sm text-slate-500">Collected</p>
           <p className="text-2xl font-bold text-green-600">
             {totalCollected.toLocaleString()}
           </p>
-          <p className="text-xs text-slate-400 mt-1">LBP received this month</p>
+          <p className="text-xs text-slate-400 mt-1">
+            LBP received for {formatMonthKey(monthKey)}
+          </p>
         </div>
         <div className="bg-white rounded-lg border border-slate-200 p-5">
           <p className="text-sm text-slate-500">Unpaid</p>
@@ -94,7 +129,7 @@ export default async function ManagerDashboardPage() {
       {/* Revenue breakdown: Ampere vs Consumption */}
       <div className="bg-white rounded-lg border border-slate-200 p-6 mb-8">
         <h2 className="font-semibold text-slate-800 mb-4">
-          Revenue Breakdown (This Month)
+          Revenue Breakdown ({formatMonthKey(monthKey)})
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div>
@@ -137,7 +172,8 @@ export default async function ManagerDashboardPage() {
             Missing Meter Readings
           </h2>
           <p className="text-sm text-slate-500 mb-4">
-            Paying customers with no counter reading recorded for this month.
+            Paying customers with no meter reading for {formatMonthKey(monthKey)}
+            .
           </p>
           {customersWithoutReading.length > 0 ? (
             <ul className="space-y-1 max-h-64 overflow-y-auto">
