@@ -1,11 +1,17 @@
 /**
- * Import customers and bills from FILE.csv into Google Sheets.
+ * Import customers and bills from CSV into Google Sheets.
  *
- * Specify the month for the readings (format: YYYY-MM):
- *   npm run import-csv -- 2025-02     (February 2025)
- *   IMPORT_MONTH=2025-03 npm run import-csv
+ * CSV format (FILE 2.csv style):
+ *   Client Name, BOX NUMBER, BUILDING NAME, Subscription Type, Amps,
+ *   Counter Previous, Counter Now, Paid till now, Total Price
  *
- * If not specified, uses current month.
+ * Total Price = what they need to pay; Paid till now = what they paid.
+ * If (Total Price - Paid till now) = 0 → PAID.
+ *
+ * Usage:
+ *   npm run import-csv -- 2025-02              # FILE.csv, February 2025
+ *   npm run import-csv -- "FILE 2.csv" 2025-02 # custom file + month
+ *   IMPORT_MONTH=2025-02 npm run import-csv -- "FILE 2.csv"
  */
 
 import { readFileSync } from "fs";
@@ -36,14 +42,23 @@ function loadEnv() {
 
 loadEnv();
 
-// Month for the imported readings: from CLI arg, env var, or current month
-function getMonthKey() {
-  const arg = process.argv[2];
-  if (arg && /^\d{4}-\d{2}$/.test(arg)) return arg;
-  const env = process.env.IMPORT_MONTH;
-  if (env && /^\d{4}-\d{2}$/.test(env)) return env;
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+// Parse CLI args: [filePath?, month?]
+function getArgs() {
+  const a = process.argv[2];
+  const b = process.argv[3];
+  let csvFile = "FILE.csv";
+  let monthKey = process.env.IMPORT_MONTH;
+  if (a && a.endsWith(".csv")) {
+    csvFile = a;
+    if (b && /^\d{4}-\d{2}$/.test(b)) monthKey = b;
+  } else if (a && /^\d{4}-\d{2}$/.test(a)) {
+    monthKey = a;
+  }
+  if (!monthKey || !/^\d{4}-\d{2}$/.test(monthKey)) {
+    const now = new Date();
+    monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  }
+  return { csvFile, monthKey };
 }
 
 function parseCSVLine(line) {
@@ -79,41 +94,34 @@ function parseAmount(str) {
 }
 
 function csvRowToCustomerAndBill(row, monthKey) {
-  const [clientName, customIdentifier, building, subscriptionType, totalPrice, amps, counterBasePrice, counterPrev, counterNow, diff, totalPayments] = row;
+  // New format: Client Name, BOX NUMBER, BUILDING NAME, Subscription Type, Amps,
+  //             Counter Previous, Counter Now, Paid till now, Total Price
+  const [clientName, boxNumber, building, subscriptionType, amps, counterPrev, counterNow, paidTillNow, totalPrice] = row;
   const name = (clientName || "").trim();
   const buildingStr = (building || "").trim();
+  const boxNumberStr = String(boxNumber || "").trim();
   if (!name) return null;
-
-  // Parse area from building: "AA - 82 MADI" -> area="AA", or use full building
-  const area = buildingStr ? buildingStr.split(/\s*-\s*/)[0]?.trim() || buildingStr : "";
 
   const billingType =
     (subscriptionType || "").toLowerCase().includes("fixed") ? "AMPERE_ONLY" : "BOTH";
   const subscribedAmpere = parseFloat(String(amps || "0").replace(/\D/g, "")) || 0;
-
-  let customerId = (customIdentifier || "").trim();
-  if (customerId) {
-    customerId = customerId.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 50);
-    if (!customerId || /^_+$/.test(customerId)) customerId = generateId("cust");
-  } else {
-    customerId = generateId("cust");
-  }
-
-  const now = new Date().toISOString();
-  const totalDue = parseAmount(totalPrice);
-  const totalPaid = parseAmount(totalPayments);
-  const remainingDue = Math.max(0, totalDue - totalPaid);
-  const paymentStatus = remainingDue <= 0 ? "PAID" : totalPaid > 0 ? "PARTIAL" : "UNPAID";
   const prevCounter = parseFloat(String(counterPrev || "0").replace(/,/g, "")) || 0;
   const currCounter = parseFloat(String(counterNow || "0").replace(/,/g, "")) || 0;
-  const usageKwh = parseFloat(String(diff || "0").replace(/,/g, "")) || 0;
-  const basePrice = parseAmount(counterBasePrice) || 0;
+
+  const customerId = generateId("cust");
+  const now = new Date().toISOString();
+
+  const totalDue = parseAmount(totalPrice);
+  const totalPaid = parseAmount(paidTillNow);
+  const remainingDue = Math.max(0, totalDue - totalPaid);
+  const paymentStatus = remainingDue <= 0 ? "PAID" : totalPaid > 0 ? "PARTIAL" : "UNPAID";
+  const usageKwh = Math.max(0, currCounter - prevCounter);
 
   const customer = {
     customerId,
     fullName: name,
     phone: "",
-    area: area || buildingStr,
+    area: boxNumberStr,
     building: buildingStr,
     floor: "",
     apartmentNumber: "",
@@ -121,7 +129,7 @@ function csvRowToCustomerAndBill(row, monthKey) {
     billingType,
     fixedDiscountAmount: 0,
     status: "ACTIVE",
-    notes: customIdentifier ? `Imported ID: ${customIdentifier}` : "",
+    notes: "",
     createdAt: now,
   };
 
@@ -133,7 +141,7 @@ function csvRowToCustomerAndBill(row, monthKey) {
     currentCounter: currCounter,
     usageKwh,
     amperePriceSnapshot: 0,
-    kwhPriceSnapshot: basePrice || 0,
+    kwhPriceSnapshot: 0,
     ampereCharge: 0,
     consumptionCharge: totalDue,
     discountApplied: 0,
@@ -191,8 +199,8 @@ function billToRow(b) {
 }
 
 async function main() {
-  const monthKey = getMonthKey();
-  const csvPath = resolve(projectRoot, "FILE.csv");
+  const { csvFile, monthKey } = getArgs();
+  const csvPath = resolve(projectRoot, csvFile);
   const credPath =
     process.env.GOOGLE_APPLICATION_CREDENTIALS ||
     "./station-490108-55c52b942e8e.json";
@@ -211,7 +219,6 @@ async function main() {
   const dataLines = lines.slice(2);
   const customers = [];
   const bills = [];
-  const seenIds = new Set();
 
   for (let i = 0; i < dataLines.length; i++) {
     const row = parseCSVLine(dataLines[i]);
@@ -219,16 +226,6 @@ async function main() {
     if (!parsed) continue;
 
     const { customer, bill } = parsed;
-
-    // Ensure unique customerId
-    let cid = customer.customerId;
-    if (seenIds.has(cid)) {
-      cid = generateId("cust");
-    }
-    seenIds.add(cid);
-    customer.customerId = cid;
-    bill.customerId = cid;
-
     customers.push(customer);
     bills.push(bill);
   }
@@ -255,7 +252,7 @@ async function main() {
     "customerId",
     "fullName",
     "phone",
-    "area",
+    "area",  // stores box number
     "building",
     "floor",
     "apartmentNumber",
