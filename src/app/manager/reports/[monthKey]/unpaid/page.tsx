@@ -25,7 +25,10 @@ export default async function UnpaidByMonthPage({
 
   const freeIds = new Set(customers.filter((c) => c.billingType === "FREE").map((c) => c.customerId));
   const monitorIds = new Set(customers.filter((c) => c.isMonitor).map((c) => c.customerId));
-  const excludedIds = new Set([...freeIds, ...monitorIds]);
+  const excludedIds = new Set([
+    ...Array.from(freeIds),
+    ...Array.from(monitorIds),
+  ]);
   const monthBills = bills.filter((b) => b.monthKey === monthKey);
   const unpaidBills = monthBills.filter(
     (b) => b.remainingDue > 0 && !excludedIds.has(b.customerId)

@@ -53,7 +53,10 @@ export default async function ManagerDashboardPage({
   const monitorCustomerIds = new Set(
     customers.filter((c) => c.isMonitor).map((c) => c.customerId)
   );
-  const excludedFromBillingIds = new Set([...freeCustomerIds, ...monitorCustomerIds]);
+  const excludedFromBillingIds = new Set([
+    ...Array.from(freeCustomerIds),
+    ...Array.from(monitorCustomerIds),
+  ]);
   const allPayingBills = bills.filter((b) => !excludedFromBillingIds.has(b.customerId));
   const payingBills = monthBills.filter((b) => !excludedFromBillingIds.has(b.customerId));
   const previousPayingBills = allPayingBills.filter(
