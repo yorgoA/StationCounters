@@ -1,7 +1,6 @@
 export const dynamic = "force-dynamic";
 
-import { getAllCustomers } from "@/lib/google-sheets";
-import { getAllBills } from "@/lib/google-sheets";
+import { getAllCustomers, getAllBills, getSettings } from "@/lib/google-sheets";
 import Link from "next/link";
 import DashboardMonthSelect from "./DashboardMonthSelect";
 
@@ -30,9 +29,10 @@ export default async function ManagerDashboardPage({
   searchParams: Promise<{ month?: string }>;
 }) {
   const params = await searchParams;
-  const [customers, bills] = await Promise.all([
+  const [customers, bills, settings] = await Promise.all([
     getAllCustomers(),
     getAllBills(),
+    getSettings(),
   ]);
 
   // Default to previous month (billing period - you collect for Feb during March)
@@ -68,7 +68,12 @@ export default async function ManagerDashboardPage({
     (s, b) => s + b.consumptionCharge,
     0
   );
-  const totalKwh = payingBills.reduce((s, b) => s + b.usageKwh, 0);
+  const totalKwhPaying = payingBills.reduce((s, b) => s + b.usageKwh, 0);
+  const totalKwhInclFree = monthBills.reduce((s, b) => s + b.usageKwh, 0);
+  const totalKwhAllTime = bills.reduce((s, b) => s + b.usageKwh, 0);
+  const kwhPrice = settings.kwhPrice || 0;
+  const consumptionExpectedInclFree =
+    kwhPrice > 0 ? Math.round(totalKwhInclFree * kwhPrice) : 0;
 
   const unpaidThisMonthList = payingBills.filter((b) => b.remainingDue > 0);
   const unpaidByPreviousMonth = previousPayingBills.reduce(
@@ -153,7 +158,7 @@ export default async function ManagerDashboardPage({
         <h2 className="font-semibold text-slate-800 mb-4">
           Revenue Breakdown ({formatMonthKey(monthKey)})
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <div>
             <p className="text-sm text-slate-500">From Ampere</p>
             <p className="text-xl font-bold text-slate-800">
@@ -169,11 +174,17 @@ export default async function ManagerDashboardPage({
               {totalConsumptionBilled.toLocaleString()} LBP
             </p>
             <p className="text-xs text-slate-400 mt-1">
-              {totalKwh.toLocaleString(undefined, {
+              {totalKwhPaying.toLocaleString(undefined, {
                 maximumFractionDigits: 0,
               })}{" "}
-              kWh sold
+              kWh (paying only)
             </p>
+            {totalKwhInclFree > totalKwhPaying && kwhPrice > 0 && (
+              <p className="text-xs text-slate-500 mt-0.5">
+                Expected if free charged: {consumptionExpectedInclFree.toLocaleString()} LBP (
+                {totalKwhInclFree.toLocaleString()} kWh total)
+              </p>
+            )}
           </div>
           <div>
             <p className="text-sm text-slate-500">Total Billed</p>
@@ -182,6 +193,18 @@ export default async function ManagerDashboardPage({
             </p>
             <p className="text-xs text-slate-400 mt-1">
               Ampere + Consumption
+            </p>
+          </div>
+          <div>
+            <p className="text-sm text-slate-500">Total kWh (all time)</p>
+            <p className="text-xl font-bold text-slate-800">
+              {totalKwhAllTime.toLocaleString(undefined, {
+                maximumFractionDigits: 0,
+              })}{" "}
+              kWh
+            </p>
+            <p className="text-xs text-slate-400 mt-1">
+              All customers, all months
             </p>
           </div>
         </div>
