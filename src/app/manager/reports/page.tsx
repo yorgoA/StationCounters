@@ -25,8 +25,9 @@ export default async function ManagerReportsPage() {
   const rows = sortedMonths.map((monthKey) => {
     const monthBillsList = monthBills.get(monthKey) ?? [];
 
+    const totalAmpere = monthBillsList.reduce((s, b) => s + b.ampereCharge, 0);
+    const totalConsumption = monthBillsList.reduce((s, b) => s + b.consumptionCharge, 0);
     const totalBilled = monthBillsList.reduce((s, b) => s + b.totalDue, 0);
-    // Use bill.totalPaid so imported "Paid till now" and app-recorded payments both count
     const totalCollected = monthBillsList.reduce((s, b) => s + b.totalPaid, 0);
     const totalKwh = monthBillsList.reduce((s, b) => s + b.usageKwh, 0);
     const billCount = monthBillsList.length;
@@ -35,6 +36,8 @@ export default async function ManagerReportsPage() {
     return {
       monthKey,
       label: formatMonthKey(monthKey),
+      totalAmpere,
+      totalConsumption,
       totalBilled,
       totalCollected,
       totalKwh,
@@ -61,7 +64,13 @@ export default async function ManagerReportsPage() {
                 Bills
               </th>
               <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">
-                Billed (LBP)
+                Ampere (LBP)
+              </th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">
+                kWh charge (LBP)
+              </th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">
+                Total billed (LBP)
               </th>
               <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">
                 Collected (LBP)
@@ -80,6 +89,12 @@ export default async function ManagerReportsPage() {
                 <td className="px-4 py-3 text-slate-800 font-medium">{r.label}</td>
                 <td className="px-4 py-3 text-right text-slate-600">{r.billCount}</td>
                 <td className="px-4 py-3 text-right text-slate-600">
+                  {r.totalAmpere.toLocaleString()}
+                </td>
+                <td className="px-4 py-3 text-right text-slate-600">
+                  {r.totalConsumption.toLocaleString()}
+                </td>
+                <td className="px-4 py-3 text-right text-slate-600 font-medium">
                   {r.totalBilled.toLocaleString()}
                 </td>
                 <td className="px-4 py-3 text-right font-medium text-green-600">

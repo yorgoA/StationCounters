@@ -16,7 +16,11 @@ export default function EditCustomerForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [subscribedAmpere, setSubscribedAmpere] = useState(customer.subscribedAmpere);
-  const [billingType, setBillingType] = useState<BillingType>(customer.billingType);
+  const [billingType, setBillingType] = useState<BillingType>(
+    ["FREE", "AMPERE_ONLY", "KWH_ONLY", "BOTH"].includes(customer.billingType)
+      ? customer.billingType
+      : "BOTH"
+  );
   const [fixedDiscountAmount, setFixedDiscountAmount] = useState(
     String(customer.fixedDiscountAmount)
   );

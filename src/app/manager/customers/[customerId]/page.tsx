@@ -44,7 +44,8 @@ export default async function ManagerCustomerDetailPage({
           </div>
 
           <div className="bg-white rounded-lg border border-slate-200 p-6">
-            <h2 className="font-semibold text-slate-800 mb-4">Edit Customer (Manager)</h2>
+            <h2 className="font-semibold text-slate-800 mb-1">Edit Customer (Manager)</h2>
+            <p className="text-xs text-slate-500 mb-4">Set billing type (Free, Ampere, kWh), subscribed Ampere, discount.</p>
             <EditCustomerForm customer={customer} ampereTiers={ampereTiers} />
           </div>
         </div>
