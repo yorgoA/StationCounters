@@ -58,6 +58,7 @@ export default async function MonitorsPage({
     fullName: string;
     area: string;
     building: string;
+    monitorCategory: string;
     links: LinkedRef[];
     monitorKwh: number;
     linkedKwh: number;
@@ -92,6 +93,7 @@ export default async function MonitorsPage({
       fullName: m.fullName,
       area: m.area,
       building: m.building,
+      monitorCategory: m.monitorCategory ?? "",
       links,
       monitorKwh: effectiveMonitorBill?.usageKwh ?? 0,
       linkedKwh,

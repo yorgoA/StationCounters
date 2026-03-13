@@ -145,6 +145,28 @@ async function main() {
     });
     console.log("✓ Updated Customers column Q (linkedCustomerId)");
   }
+
+  // Column R (index 17) = monitorCategory
+  const R_IDX = 17;
+  const needsRHeader = !header[R_IDX] || header[R_IDX].toString().toLowerCase().replace(/\s/g, "") !== "monitorcategory";
+  const rValues = [];
+  if (needsRHeader) rValues.push(["monitorCategory"]);
+  for (let i = 0; i < dataRows.length; i++) {
+    const row = dataRows[i];
+    const current = row[R_IDX];
+    rValues.push([current !== undefined && current !== null && String(current).trim() ? String(current).trim() : ""]);
+  }
+  const rStartRow = needsRHeader ? 1 : 2;
+  const rRange = `Customers!R${rStartRow}:R${rStartRow + rValues.length - 1}`;
+  if (rValues.length > 0) {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: rRange,
+      valueInputOption: "RAW",
+      requestBody: { values: rValues },
+    });
+    console.log("✓ Updated Customers column R (monitorCategory)");
+  }
   console.log("");
 }
 

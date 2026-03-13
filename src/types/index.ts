@@ -35,7 +35,10 @@ export interface Customer {
   isMonitor?: boolean; // Links to main customer; excluded from collection
   linkedCustomerId?: string; // Deprecated: use linkedCustomerIds
   linkedCustomerIds?: string[]; // Required when isMonitor: customers whose meters this monitor tracks
+  monitorCategory?: string; // When isMonitor: e.g. elevator, theftcontroller
 }
+
+export const MONITOR_CATEGORIES = ["elevator", "theftcontroller"] as const;
 
 export interface CreateCustomerInput {
   fullName: string;

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { updateCustomerAction } from "@/app/actions/customer";
 import type { AmperePriceTier, Customer, BillingType } from "@/types";
+import { MONITOR_CATEGORIES } from "@/types";
 
 export default function EditCustomerForm({
   customer,
@@ -39,6 +40,7 @@ export default function EditCustomerForm({
       ? customer.linkedCustomerIds
       : (customer.linkedCustomerId ? [customer.linkedCustomerId] : []);
   const [linkedCustomerIds, setLinkedCustomerIds] = useState<string[]>(initialLinked);
+  const [monitorCategory, setMonitorCategory] = useState(customer.monitorCategory ?? "");
 
   const effectiveBillingType = freeChecked ? "FREE" : billingType;
   const showMonitorOption =
@@ -77,6 +79,7 @@ export default function EditCustomerForm({
       status: activeChecked ? "ACTIVE" : "INACTIVE",
       isMonitor: showMonitorOption && monitorChecked,
       linkedCustomerIds: showMonitorOption && monitorChecked ? linkedCustomerIds : undefined,
+      monitorCategory: showMonitorOption && monitorChecked ? (monitorCategory.trim() || undefined) : undefined,
     });
     setLoading(false);
     if (result.error) {
@@ -164,14 +167,34 @@ export default function EditCustomerForm({
                 checked={monitorChecked}
                 onChange={(e) => {
                   setMonitorChecked(e.target.checked);
-                  if (!e.target.checked) setLinkedCustomerIds([]);
+                  if (!e.target.checked) {
+                    setLinkedCustomerIds([]);
+                    setMonitorCategory("");
+                  }
                 }}
                 className="rounded border-slate-300"
               />
               <span className="text-sm font-medium text-slate-700">Monitor (track usage, excluded from collection)</span>
             </label>
             {monitorChecked && (
-              <div>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Category</label>
+                  <select
+                    value={monitorCategory}
+                    onChange={(e) => setMonitorCategory(e.target.value)}
+                    className="input"
+                  >
+                    <option value="">— Select category —</option>
+                    {MONITOR_CATEGORIES.map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-slate-500 mt-0.5">Filter monitors by category on the Monitors page.</p>
+                </div>
+                <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Linked customers (required, can select multiple) *</label>
                 <div className="max-h-48 overflow-y-auto border border-slate-200 rounded-lg p-2 space-y-1 bg-white">
                   {linkableCustomers.map((c) => (
@@ -191,6 +214,7 @@ export default function EditCustomerForm({
                 <p className="text-xs text-slate-500 mt-1">
                   Customers whose meters this monitor tracks. At least one required.
                 </p>
+                </div>
               </div>
             )}
           </div>
