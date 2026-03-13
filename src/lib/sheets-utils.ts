@@ -20,6 +20,7 @@ export function rowToCustomer(row: string[]): Customer {
     status: (r[10] || "ACTIVE") as Customer["status"],
     notes: r[11] || "",
     createdAt: r[12] || new Date().toISOString(),
+    freeReason: r[13] || "",
   };
 }
 
@@ -38,6 +39,7 @@ export function customerToRow(c: Customer): string[] {
     c.status,
     c.notes,
     c.createdAt,
+    c.freeReason ?? "",
   ];
 }
 

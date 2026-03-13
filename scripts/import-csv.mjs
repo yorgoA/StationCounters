@@ -132,6 +132,7 @@ function csvRowToCustomerAndBill(row, monthKey) {
     status: "ACTIVE",
     notes: "",
     createdAt: now,
+    freeReason: "",
   };
 
   const bill = {
@@ -173,6 +174,7 @@ function customerToRow(c) {
     c.status,
     c.notes,
     c.createdAt,
+    c.freeReason ?? "",
   ];
 }
 
@@ -275,7 +277,7 @@ async function main() {
     "customerId",
     "fullName",
     "phone",
-    "area",  // stores box number
+    "area",
     "building",
     "floor",
     "apartmentNumber",
@@ -285,6 +287,7 @@ async function main() {
     "status",
     "notes",
     "createdAt",
+    "freeReason",
   ];
 
   const values = [headerRow, ...customers.map(customerToRow)];

@@ -20,6 +20,7 @@ const managerNav = [
   { href: "/manager", label: "Dashboard" },
   { href: "/manager/reports", label: "Reports" },
   { href: "/manager/customers", label: "Customers" },
+  { href: "/manager/free-customers", label: "Free Customers" },
   { href: "/manager/bills", label: "Bills" },
   { href: "/manager/payments", label: "Payments" },
   { href: "/manager/settings", label: "Settings" },

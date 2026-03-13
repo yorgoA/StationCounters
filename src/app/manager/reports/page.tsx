@@ -81,6 +81,9 @@ export default async function ManagerReportsPage() {
               <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">
                 Unpaid
               </th>
+              <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">
+                Print
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200">
@@ -114,6 +117,14 @@ export default async function ManagerReportsPage() {
                   ) : (
                     <span className="text-slate-400 text-sm">All paid</span>
                   )}
+                </td>
+                <td className="px-4 py-3 text-center">
+                  <Link
+                    href={`/manager/print-bills/${r.monthKey}`}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-slate-100 text-slate-700 hover:bg-slate-200 font-medium text-sm"
+                  >
+                    Print bills
+                  </Link>
                 </td>
               </tr>
             ))}

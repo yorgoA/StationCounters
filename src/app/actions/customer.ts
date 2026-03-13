@@ -95,11 +95,45 @@ export async function updateCustomerAction(customer: Customer) {
     await dbUpdateCustomer(customer);
     revalidatePath("/manager");
     revalidatePath("/manager/customers");
+    revalidatePath("/manager/free-customers");
     revalidatePath(`/manager/customers/${customer.customerId}`);
     return { success: true };
   } catch (err) {
     return {
       error: err instanceof Error ? err.message : "Failed to update customer",
+    };
+  }
+}
+
+export async function updateFreeCustomerAction(input: {
+  customerId: string;
+  billingType: "FREE" | "BOTH";
+  freeReason?: string;
+}) {
+  const session = await getSession();
+  if (!session.isLoggedIn || session.role !== "manager") {
+    return { error: "Only manager can update free customers" };
+  }
+
+  const existing = await getCustomerById(input.customerId);
+  if (!existing) return { error: "Customer not found" };
+
+  const updated: Customer = {
+    ...existing,
+    billingType: input.billingType,
+    freeReason: input.billingType === "FREE" ? (input.freeReason ?? existing.freeReason ?? "") : "",
+  };
+
+  try {
+    await dbUpdateCustomer(updated);
+    revalidatePath("/manager");
+    revalidatePath("/manager/customers");
+    revalidatePath("/manager/free-customers");
+    revalidatePath(`/manager/customers/${input.customerId}`);
+    return { success: true };
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Failed to update",
     };
   }
 }

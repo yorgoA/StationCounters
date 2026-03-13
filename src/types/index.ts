@@ -30,6 +30,7 @@ export interface Customer {
   status: CustomerStatus;
   notes: string;
   createdAt: string;
+  freeReason?: string;
 }
 
 export interface CreateCustomerInput {

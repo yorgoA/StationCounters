@@ -29,14 +29,44 @@ body {
 @media print {
   header,
   .print\:hidden,
-  .bill-print-content a[href*="Back"] {
+  .bill-print-content a[href*="Back"],
+  .print-monthly-bills a[href*="Back"] {
     display: none !important;
   }
-  .bill-print-content button {
+  .bill-print-content button,
+  .print-monthly-bills button {
     display: none !important;
   }
   main {
     padding: 0 !important;
     max-width: 100% !important;
+  }
+  /* Monthly bills: 2 per A4 page, A5 size each when cut */
+  .print-bills-pages {
+    padding: 0 !important;
+  }
+  .print-bills-pages .print-page {
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    gap: 0 !important;
+  }
+  .print-page {
+    width: 100%;
+    page-break-after: always;
+  }
+  .print-page:last-child {
+    page-break-after: auto;
+  }
+  .print-page .bill-card {
+    min-height: 135mm; /* ~half A4 for cut-and-distribute */
+    break-inside: avoid;
+    border: 1px solid #94a3b8 !important;
+    padding: 6px !important;
+    margin-bottom: 2mm;
+  }
+  .print-page .bill-card:last-child {
+    margin-bottom: 0;
   }
 }
