@@ -9,14 +9,20 @@ export async function uploadReceiptAction(formData: FormData) {
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const ext = file.name.split(".").pop() || "jpg";
+  const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
   const mimeMap: Record<string, string> = {
     jpg: "image/jpeg",
     jpeg: "image/jpeg",
     png: "image/png",
     webp: "image/webp",
+    heic: "image/heic",
+    heif: "image/heif",
   };
-  const mimeType = mimeMap[ext] || "image/jpeg";
+  const mimeFromClient = file.type?.trim();
+  const mimeType =
+    mimeFromClient && mimeFromClient.startsWith("image/")
+      ? mimeFromClient
+      : mimeMap[ext] || "image/jpeg";
   const filename = `receipt_${Date.now()}.${ext}`;
 
   try {

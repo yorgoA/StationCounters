@@ -1,9 +1,10 @@
 /**
  * Google Sheets service - server-side only.
- * Uses 60s cache to reduce API quota usage (Read requests per minute).
+ * Reads are not cached: a previous 60s unstable_cache caused wrong bill totals
+ * (create bill used stale kWh price / ampere tiers until cache expired; manager
+ * "save reading" looked like a fix because it re-read fresh data).
  */
 
-import { unstable_cache } from "next/cache";
 import { google } from "googleapis";
 import { getGoogleAuth } from "./google-auth";
 import {
@@ -61,9 +62,7 @@ async function getSheets() {
   return { sheets, spreadsheetId };
 }
 
-const CACHE_SECONDS = 60; // Reduces quota: max 1 read per sheet per minute
-
-async function getRangeUncached(sheetName: string, range?: string): Promise<string[][]> {
+async function getRange(sheetName: string, range?: string): Promise<string[][]> {
   const { sheets, spreadsheetId } = await getSheets();
   const fullRange = range ? `${sheetName}!${range}` : sheetName;
   const res = await sheets.spreadsheets.values.get({
@@ -71,14 +70,6 @@ async function getRangeUncached(sheetName: string, range?: string): Promise<stri
     range: fullRange,
   });
   return (res.data.values || []) as string[][];
-}
-
-function getRange(sheetName: string, range?: string): Promise<string[][]> {
-  return unstable_cache(
-    () => getRangeUncached(sheetName, range),
-    [`sheets-${sheetName}-${range ?? "full"}`],
-    { revalidate: CACHE_SECONDS }
-  )();
 }
 
 async function appendRow(sheetName: string, values: string[]) {
