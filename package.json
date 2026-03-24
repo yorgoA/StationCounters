@@ -15,6 +15,7 @@
     "update-sheets": "node scripts/update-sheets-columns.mjs",
     "verify-sheet": "node scripts/verify-sheet-structure.mjs",
     "verify-receipt-folder": "node scripts/verify-receipt-folder.mjs",
+    "delete-blob": "node scripts/delete-blob.mjs",
     "set-billing": "node scripts/set-customer-billing.mjs"
   },
   "dependencies": {
