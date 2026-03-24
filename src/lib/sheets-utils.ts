@@ -2,7 +2,16 @@
  * Row mapping utilities: convert between Google Sheets rows and typed entities.
  */
 
-import type { AmperePriceTier, Bill, Customer, Payment, Settings } from "@/types";
+import type { AmperePriceTier, Bill, BillingType, Customer, Payment, Settings } from "@/types";
+
+/** Sheet cells often have trailing spaces; strict equality in billing would skip BOTH ampere + kWh. */
+export function normalizeBillingType(raw: string | undefined): BillingType {
+  const t = (raw ?? "").trim().toUpperCase();
+  if (t === "AMPERE_ONLY" || t === "KWH_ONLY" || t === "BOTH" || t === "FREE") {
+    return t;
+  }
+  return "BOTH";
+}
 
 export function rowToCustomer(row: string[]): Customer {
   const r = row as unknown as string[];
@@ -15,7 +24,7 @@ export function rowToCustomer(row: string[]): Customer {
     floor: r[5] || "",
     apartmentNumber: r[6] || "",
     subscribedAmpere: parseFloat(r[7] || "0") || 0,
-    billingType: (r[8] || "BOTH") as Customer["billingType"],
+    billingType: normalizeBillingType(r[8]),
     fixedDiscountAmount: parseFloat(r[9] || "0") || 0,
     fixedDiscountPercent: parseFloat(r[14] || "0") || 0,
     status: (r[10] || "ACTIVE") as Customer["status"],

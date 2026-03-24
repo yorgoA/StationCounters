@@ -42,7 +42,7 @@ export function calcConsumptionCharge(
 ): number {
   if (billingType === "FREE") return 0;
   if (billingType === "KWH_ONLY" || billingType === "BOTH") {
-    return usageKwh * kwhPrice;
+    return Math.round(usageKwh * kwhPrice);
   }
   return 0;
 }

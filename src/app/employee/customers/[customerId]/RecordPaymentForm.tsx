@@ -20,15 +20,41 @@ export default function RecordPaymentForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [receiptUrl, setReceiptUrl] = useState("");
+  const [receiptUploading, setReceiptUploading] = useState(false);
+  const [receiptError, setReceiptError] = useState("");
 
   async function handleReceiptUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    setReceiptError("");
+    setReceiptUrl("");
+    setReceiptUploading(true);
     const formData = new FormData();
     formData.append("file", file);
-    const res = await fetch("/api/receipt/upload", { method: "POST", body: formData });
-    const data = await res.json();
-    if (data.url) setReceiptUrl(data.url);
+    try {
+      const res = await fetch("/api/receipt/upload", { method: "POST", body: formData });
+      let data: { url?: string; error?: string } = {};
+      try {
+        data = await res.json();
+      } catch {
+        setReceiptError("Receipt upload failed (invalid server response). Check Google Drive setup.");
+        setReceiptUploading(false);
+        return;
+      }
+      if (!res.ok) {
+        setReceiptError(data.error || `Receipt upload failed (${res.status}).`);
+        setReceiptUploading(false);
+        return;
+      }
+      if (data.url) {
+        setReceiptUrl(data.url);
+      } else {
+        setReceiptError("Receipt upload did not return a link.");
+      }
+    } catch {
+      setReceiptError("Network error while uploading receipt.");
+    }
+    setReceiptUploading(false);
   }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -118,14 +144,24 @@ export default function RecordPaymentForm({
           onChange={handleReceiptUpload}
           className="block w-full text-sm text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
         />
-        {receiptUrl && <p className="text-xs text-green-600 mt-1">✓ Receipt uploaded</p>}
+        {receiptUploading && (
+          <p className="text-xs text-slate-600 mt-1">Uploading receipt…</p>
+        )}
+        {receiptUrl && !receiptUploading && (
+          <p className="text-xs text-green-600 mt-1">✓ Receipt uploaded</p>
+        )}
+        {receiptError && <p className="text-xs text-red-600 mt-1">{receiptError}</p>}
       </div>
       <div>
         <label className="block text-sm font-medium text-slate-700 mb-1">Note</label>
         <input name="note" className="input" placeholder="Optional" />
       </div>
       {error && <p className="text-red-600 text-sm">{error}</p>}
-      <button type="submit" disabled={loading || !receiptUrl} className="btn-primary">
+      <button
+        type="submit"
+        disabled={loading || receiptUploading || !receiptUrl}
+        className="btn-primary"
+      >
         {loading ? "Recording..." : "Record Payment"}
       </button>
     </form>
