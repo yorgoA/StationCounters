@@ -29,6 +29,10 @@ yarn-error.log*
 .vercel
 
 # Google / service account credentials
+service-account.json
 *-credentials.json
 *credentials*.json
 station-*.json
+
+# Local scratch / import CSVs (keep repo clean)
+FILE*.csv

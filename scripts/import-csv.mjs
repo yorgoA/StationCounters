@@ -286,10 +286,7 @@ async function main() {
   const creds = JSON.parse(readFileSync(credFullPath, "utf-8"));
   const auth = new google.auth.GoogleAuth({
     credentials: creds,
-    scopes: [
-      "https://www.googleapis.com/auth/spreadsheets",
-      "https://www.googleapis.com/auth/drive.file",
-    ],
+    scopes: ["https://www.googleapis.com/auth/spreadsheets"],
   });
 
   const sheets = google.sheets({ version: "v4", auth });

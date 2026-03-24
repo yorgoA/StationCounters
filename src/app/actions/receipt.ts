@@ -1,6 +1,7 @@
 "use server";
 
-import { uploadReceipt } from "@/lib/google-drive";
+import { inferReceiptImageMime } from "@/lib/receipt-image";
+import { uploadReceiptImage } from "@/lib/receipt-upload";
 
 export async function uploadReceiptAction(formData: FormData) {
   const file = formData.get("file") as File | null;
@@ -9,24 +10,10 @@ export async function uploadReceiptAction(formData: FormData) {
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-  const mimeMap: Record<string, string> = {
-    jpg: "image/jpeg",
-    jpeg: "image/jpeg",
-    png: "image/png",
-    webp: "image/webp",
-    heic: "image/heic",
-    heif: "image/heif",
-  };
-  const mimeFromClient = file.type?.trim();
-  const mimeType =
-    mimeFromClient && mimeFromClient.startsWith("image/")
-      ? mimeFromClient
-      : mimeMap[ext] || "image/jpeg";
-  const filename = `receipt_${Date.now()}.${ext}`;
+  const mimeType = inferReceiptImageMime(file);
 
   try {
-    const result = await uploadReceipt(buffer, filename, mimeType);
+    const result = await uploadReceiptImage(buffer, mimeType);
     return { success: true, url: result.webViewLink };
   } catch (err) {
     return {

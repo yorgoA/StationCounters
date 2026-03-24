@@ -108,14 +108,13 @@ Create a Google Sheet with these tabs and headers (exact order matters):
 - Row 1: `amp`, `price`
 - Data rows: one per amperage tier, e.g. `3`, `231000` (3A = 231,000 LBP)
 
-### 6. Create Google Drive Folder for Receipts
+### 6. Receipt images (Vercel Blob)
 
-1. Create a new folder in Google Drive for receipt images
-2. Share it with the service account email as **Editor**
-3. Open the folder and copy the Folder ID from the URL:  
-   `https://drive.google.com/drive/folders/`**`YOUR_FOLDER_ID`**
+Receipt uploads **require** **`BLOB_READ_WRITE_TOKEN`**. Create a Blob store under **Storage → Blob** in Vercel and connect the read/write token to your project (and `.env.local` for dev). There is **no Google Drive fallback** in the app for receipts.
 
-Put `YOUR_FOLDER_ID` in `GOOGLE_DRIVE_RECEIPTS_FOLDER_ID`.
+Images are **resized and re-encoded as JPEG** on the server (defaults: max edge 1600px, quality 82). Optional env: **`RECEIPT_MAX_PIXEL_EDGE`** (640–4096), **`RECEIPT_JPEG_QUALITY`** (60–95).
+
+You do **not** need **`GOOGLE_DRIVE_RECEIPTS_FOLDER_ID`** for receipts. That variable is only relevant if you run **`npm run verify-receipt-folder`** to debug a Drive folder (optional).
 
 ---
 
@@ -163,7 +162,7 @@ git push -u origin main
 
 1. Go to [vercel.com](https://vercel.com)
 2. Import your repository
-3. Add environment variables (all from `.env.local`)
+3. Add environment variables (from `.env.local`). **Receipts require `BLOB_READ_WRITE_TOKEN`** (Storage → Blob). Optional: **`RECEIPT_MAX_PIXEL_EDGE`** / **`RECEIPT_JPEG_QUALITY`**.
 
 ### 3. Google Credentials on Vercel
 
@@ -198,7 +197,8 @@ src/
 ├── components/
 ├── lib/
 │   ├── billing.ts        # Billing calculation logic
-│   ├── google-drive.ts   # Drive upload
+│   ├── receipt-image.ts  # Resize / JPEG receipts (sharp)
+│   ├── receipt-upload.ts # Vercel Blob upload
 │   ├── google-sheets.ts  # Sheets CRUD
 │   ├── auth.ts
 │   └── ...
