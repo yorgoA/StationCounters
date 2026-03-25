@@ -5,7 +5,8 @@ import UnpaidBillsTable from "./UnpaidBillsTable";
 
 export default async function EmployeePaymentsPage() {
   const [customers, bills] = await Promise.all([getAllCustomers(), getAllBills()]);
-  const unpaidBills = bills.filter((b) => b.remainingDue > 0);
+  const monitorCustomerIds = new Set(customers.filter((c) => c.isMonitor).map((c) => c.customerId));
+  const unpaidBills = bills.filter((b) => b.remainingDue > 0 && !monitorCustomerIds.has(b.customerId));
   const activeCustomerIds = new Set(
     customers.filter((c) => c.status === "ACTIVE").map((c) => c.customerId)
   );

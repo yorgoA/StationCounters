@@ -22,6 +22,7 @@ export default function UnpaidBillsTable({
     return activeUnpaid.filter((b) => {
       const cust = customers.find((c) => c.customerId === b.customerId);
       if (!cust) return false;
+      if (cust.isMonitor) return false;
       return (
         cust.fullName.toLowerCase().includes(lower) ||
         (cust.phone && cust.phone.includes(q)) ||
