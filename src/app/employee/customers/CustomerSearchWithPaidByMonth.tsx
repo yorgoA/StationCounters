@@ -149,7 +149,6 @@ export default function CustomerSearchWithPaidByMonth({
           <select
             value={monthKey}
             onChange={(e) => setMonthKey(e.target.value)}
-            disabled={!paidOnly}
             className="rounded-lg border border-slate-300 px-3 py-2 text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-60"
           >
             {months.length === 0 ? (
