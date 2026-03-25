@@ -31,7 +31,7 @@ export default async function EmployeeCustomersPage({
 
       {showAddForm && (
         <div className="mb-8">
-          <AddCustomerForm ampereTiers={ampereTiers} />
+          <AddCustomerForm ampereTiers={ampereTiers} allCustomers={customers} />
         </div>
       )}
 

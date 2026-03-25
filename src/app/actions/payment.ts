@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth";
 import {
   createPayment as dbCreatePayment,
+  getCustomerById,
   getAllBills,
   updateBill as dbUpdateBill,
 } from "@/lib/google-sheets";
@@ -90,6 +91,14 @@ export async function recordPaymentAction(formData: FormData) {
   }
   if (!Number.isFinite(amountPaid) || amountPaid <= 0) {
     return { error: "Enter a valid amount" };
+  }
+
+  const customer = await getCustomerById(customerId);
+  if (!customer) {
+    return { error: "Customer not found" };
+  }
+  if (customer.isMonitor) {
+    return { error: "Monitor accounts cannot receive payments." };
   }
 
   const file = formData.get("receipt");

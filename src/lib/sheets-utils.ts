@@ -7,7 +7,13 @@ import type { AmperePriceTier, Bill, BillingType, Customer, Payment, Settings } 
 /** Sheet cells often have trailing spaces; strict equality in billing would skip BOTH ampere + kWh. */
 export function normalizeBillingType(raw: string | undefined): BillingType {
   const t = (raw ?? "").trim().toUpperCase();
-  if (t === "AMPERE_ONLY" || t === "KWH_ONLY" || t === "BOTH" || t === "FREE") {
+  if (
+    t === "AMPERE_ONLY" ||
+    t === "KWH_ONLY" ||
+    t === "BOTH" ||
+    t === "FREE" ||
+    t === "FIXED_MONTHLY"
+  ) {
     return t;
   }
   return "BOTH";
@@ -27,6 +33,7 @@ export function rowToCustomer(row: string[]): Customer {
     billingType: normalizeBillingType(r[8]),
     fixedDiscountAmount: parseFloat(r[9] || "0") || 0,
     fixedDiscountPercent: parseFloat(r[14] || "0") || 0,
+    fixedMonthlyPrice: parseFloat(r[18] || "0") || 0,
     status: (r[10] || "ACTIVE") as Customer["status"],
     notes: r[11] || "",
     createdAt: r[12] || new Date().toISOString(),
@@ -65,6 +72,7 @@ export function customerToRow(c: Customer): string[] {
       ? c.linkedCustomerIds.join(",")
       : (c.linkedCustomerId ?? ""),
     c.monitorCategory ?? "",
+    String(c.fixedMonthlyPrice ?? 0),
   ];
 }
 

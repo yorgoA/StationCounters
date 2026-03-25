@@ -110,8 +110,9 @@ export default async function PrintMonthlyBillsPage({
     getAllCustomers(),
   ]);
 
+  const monitorCustomerIds = new Set(customers.filter((c) => c.isMonitor).map((c) => c.customerId));
   const monthBills = bills
-    .filter((b) => b.monthKey === monthKey)
+    .filter((b) => b.monthKey === monthKey && !monitorCustomerIds.has(b.customerId))
     .sort((a, b) => {
       const custA = customers.find((c) => c.customerId === a.customerId);
       const custB = customers.find((c) => c.customerId === b.customerId);

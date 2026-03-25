@@ -59,6 +59,12 @@ export default function RecordReadingForm({
           Ampere-only customers are not charged for kWh, but we still record counter readings to monitor for anomalies.
         </p>
       )}
+      {customer.billingType === "FIXED_MONTHLY" && (
+        <p className="text-sm text-slate-500 bg-slate-50 px-3 py-2 rounded-lg">
+          Fixed monthly customers: bill total is the fixed monthly price (LBP / month). We still record readings
+          for monitoring and kWh reference.
+        </p>
+      )}
       <p className="text-sm text-slate-500">
         Select the month for these readings. You cannot change a reading after submitting—contact the manager for corrections.
       </p>

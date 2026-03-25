@@ -29,6 +29,7 @@ const managerNav = [
 
 export default function DashboardLayout({ role, children }: Props) {
   const pathname = usePathname();
+  const activePath = pathname ?? "";
   const nav = role === "manager" ? managerNav : employeeNav;
 
   async function handleLogout() {
@@ -51,7 +52,8 @@ export default function DashboardLayout({ role, children }: Props) {
                     key={item.href}
                     href={item.href}
                     className={`text-sm font-medium ${
-                      pathname === item.href || (item.href !== "/manager" && pathname.startsWith(item.href + "/"))
+                      activePath === item.href ||
+                      (item.href !== "/manager" && activePath.startsWith(item.href + "/"))
                         ? "text-primary-600"
                         : "text-slate-600 hover:text-slate-900"
                     }`}

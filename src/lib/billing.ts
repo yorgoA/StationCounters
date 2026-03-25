@@ -98,6 +98,7 @@ export function calcBillFromReadings(
   currentCounter: number,
   subscribedAmpere: number,
   billingType: BillingType,
+  fixedMonthlyPrice: number,
   fixedDiscountAmount: number,
   fixedDiscountPercent: number,
   ampereTiers: AmperePriceTier[],
@@ -125,6 +126,29 @@ export function calcBillFromReadings(
       paymentStatus: "PAID",
     };
   }
+
+  // Fixed monthly: charge is constant per month (ignore discounts).
+  if (billingType === "FIXED_MONTHLY") {
+    const totalDue = fixedMonthlyPrice + previousUnpaidBalance;
+    return {
+      customerId,
+      monthKey,
+      previousCounter,
+      currentCounter,
+      usageKwh,
+      amperePriceSnapshot: getAmperePriceForTier(subscribedAmpere, ampereTiers),
+      kwhPriceSnapshot: kwhPrice,
+      ampereCharge: 0,
+      consumptionCharge: 0,
+      discountApplied: 0,
+      previousUnpaidBalance,
+      totalDue,
+      totalPaid: 0,
+      remainingDue: totalDue,
+      paymentStatus: calcPaymentStatus(0, totalDue),
+    };
+  }
+
   const ampereCharge = calcAmpereCharge(subscribedAmpere, ampereTiers, billingType);
   const consumptionCharge = calcConsumptionCharge(usageKwh, kwhPrice, billingType);
   const totalBeforeDiscount = calcTotalBeforeDiscount(

@@ -37,8 +37,13 @@ async function main() {
   const linkIdx = args.indexOf("--link");
   const linkedCustomerId = linkIdx >= 0 ? args[linkIdx + 1] : null;
 
-  if (!customerId || !["FREE", "BOTH", "KWH_ONLY", "AMPERE_ONLY"].includes(billingType)) {
-    console.error("Usage: node scripts/set-customer-billing.mjs <customerId> <FREE|BOTH|KWH_ONLY|AMPERE_ONLY> [--monitor] [--link customerId]");
+  if (
+    !customerId ||
+    !["FREE", "BOTH", "KWH_ONLY", "AMPERE_ONLY", "FIXED_MONTHLY"].includes(billingType)
+  ) {
+    console.error(
+      "Usage: node scripts/set-customer-billing.mjs <customerId> <FREE|BOTH|KWH_ONLY|AMPERE_ONLY|FIXED_MONTHLY> [--monitor] [--link customerId]"
+    );
     process.exit(1);
   }
 

@@ -31,6 +31,7 @@ const EXPECTED_HEADERS = [
   "customerId", "fullName", "phone", "area", "building", "floor", "apartmentNumber",
   "subscribedAmpere", "billingType", "fixedDiscountAmount", "status", "notes",
   "createdAt", "freeReason", "fixedDiscountPercent", "isMonitor", "linkedCustomerId",
+  "monitorCategory", "fixedMonthlyPrice",
 ];
 
 async function main() {
@@ -53,7 +54,7 @@ async function main() {
 
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: "Customers!A1:Q500",
+    range: "Customers!A1:S500",
   });
   const rows = res.data.values || [];
   const header = (rows[0] || []).map((h) => String(h || "").trim());
@@ -68,11 +69,13 @@ async function main() {
   console.log("");
 
   const missing = [];
-  for (let i = 0; i < Math.min(17, EXPECTED_HEADERS.length); i++) {
-    const exp = EXPECTED_HEADERS[i].toLowerCase();
-    const got = (header[i] || "").toLowerCase();
-    if (got !== exp && (i < 15 || (header[i] || "").trim() === "")) {
-      missing.push(`Col ${String.fromCharCode(65 + i)}: expected "${EXPECTED_HEADERS[i]}", got "${header[i] || ""}"`);
+  for (let i = 0; i < EXPECTED_HEADERS.length; i++) {
+    const exp = EXPECTED_HEADERS[i].toLowerCase().replace(/\s/g, "");
+    const got = (header[i] || "").toLowerCase().replace(/\s/g, "");
+    if (got !== exp) {
+      missing.push(
+        `Col ${String.fromCharCode(65 + i)}: expected "${EXPECTED_HEADERS[i]}", got "${header[i] || ""}"`
+      );
     }
   }
   if (missing.length > 0) {
@@ -108,6 +111,8 @@ async function main() {
   console.log("  billingType (col I):", row[8] || "(empty)");
   console.log("  Col P (isMonitor):", row[15] ?? "(empty)");
   console.log("  Col Q (linkedCustomerId):", row[16] ?? "(empty)");
+  console.log("  Col R (monitorCategory):", row[17] ?? "(empty)");
+  console.log("  Col S (fixedMonthlyPrice):", row[18] ?? "(empty)");
   console.log("");
 }
 

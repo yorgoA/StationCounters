@@ -16,9 +16,13 @@ export default async function ManagerBillsPage({
   const params = await searchParams;
   const monthKey = params.month || getCurrentMonthKey();
   const [bills, customers] = await Promise.all([getAllBills(), getAllCustomers()]);
-  const monthBills = bills.filter((b) => b.monthKey === monthKey);
 
-  const months = Array.from(new Set(bills.map((b) => b.monthKey))).sort().reverse();
+  const monitorCustomerIds = new Set(customers.filter((c) => c.isMonitor).map((c) => c.customerId));
+  const payingBills = bills.filter((b) => !monitorCustomerIds.has(b.customerId));
+
+  const monthBills = payingBills.filter((b) => b.monthKey === monthKey);
+
+  const months = Array.from(new Set(payingBills.map((b) => b.monthKey))).sort().reverse();
   if (months.length === 0) months.push(monthKey);
 
   return (

@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createCustomerAction } from "@/app/actions/customer";
-import type { AmperePriceTier, BillingType } from "@/types";
+import { MONITOR_CATEGORIES } from "@/types";
+import type { AmperePriceTier, BillingType, Customer } from "@/types";
 
 function getDiscountValues(
   amount: number,
@@ -17,13 +18,25 @@ function getDiscountValues(
 export default function AddCustomerForm({
   basePath = "/employee/customers",
   ampereTiers,
+  allCustomers = [],
 }: {
   basePath?: string;
   ampereTiers: AmperePriceTier[];
+  allCustomers?: Customer[];
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [billingType, setBillingType] = useState<BillingType>("BOTH");
+  const [monitorChecked, setMonitorChecked] = useState(false);
+  const [linkedCustomerIds, setLinkedCustomerIds] = useState<string[]>([]);
+  const [monitorCategory, setMonitorCategory] = useState("");
+
+  const linkableCustomers = allCustomers.filter((c) => !c.isMonitor);
+
+  function toggleLinked(id: string) {
+    setLinkedCustomerIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -45,9 +58,13 @@ export default function AddCustomerForm({
       apartmentNumber: data.get("apartmentNumber") as string,
       subscribedAmpere: Number(data.get("subscribedAmpere")) || 0,
       billingType: (data.get("billingType") as BillingType) || "BOTH",
+      fixedMonthlyPrice: Number(data.get("fixedMonthlyPrice")) || 0,
       ...discount,
       status: "ACTIVE",
       notes: (data.get("notes") as string) || "",
+      isMonitor: monitorChecked,
+      linkedCustomerIds: monitorChecked ? linkedCustomerIds : undefined,
+      monitorCategory: monitorChecked ? (monitorCategory.trim() || undefined) : undefined,
     });
 
     setLoading(false);
@@ -105,12 +122,96 @@ export default function AddCustomerForm({
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">Billing Type</label>
-          <select name="billingType" className="input" defaultValue="BOTH">
+          <select
+            name="billingType"
+            className="input"
+            value={billingType}
+            onChange={(e) => setBillingType(e.target.value as BillingType)}
+          >
             <option value="FREE">Free (no charge)</option>
             <option value="AMPERE_ONLY">Ampere Only</option>
             <option value="KWH_ONLY">kWh Only</option>
             <option value="BOTH">Both</option>
+            <option value="FIXED_MONTHLY">Fixed monthly (ma2touua)</option>
           </select>
+        </div>
+        {billingType === "FIXED_MONTHLY" && (
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Fixed monthly price (LBP / month)
+            </label>
+            <input name="fixedMonthlyPrice" type="number" step="0.01" required className="input" defaultValue={0} />
+          </div>
+        )}
+
+        <div className="md:col-span-2 border border-slate-200 rounded-lg p-4 bg-slate-50 space-y-3">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={monitorChecked}
+              onChange={(e) => {
+                setMonitorChecked(e.target.checked);
+                if (!e.target.checked) {
+                  setLinkedCustomerIds([]);
+                  setMonitorCategory("");
+                }
+              }}
+              className="rounded border-slate-300"
+            />
+            <span className="text-sm font-medium text-slate-700">
+              Monitor (track usage, excluded from collection)
+            </span>
+          </label>
+
+          {monitorChecked && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Category</label>
+                <select
+                  value={monitorCategory}
+                  onChange={(e) => setMonitorCategory(e.target.value)}
+                  className="input"
+                >
+                  <option value="">— Select category —</option>
+                  {MONITOR_CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Linked customers (required, can select multiple) *
+                </label>
+                <div className="max-h-48 overflow-y-auto border border-slate-200 rounded-lg p-2 space-y-1 bg-white">
+                  {linkableCustomers.map((c) => (
+                    <label
+                      key={c.customerId}
+                      className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-2 rounded"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={linkedCustomerIds.includes(c.customerId)}
+                        onChange={() => toggleLinked(c.customerId)}
+                        className="rounded border-slate-300"
+                      />
+                      <span className="text-sm">
+                        {c.fullName} • {c.area} {c.building}
+                      </span>
+                    </label>
+                  ))}
+                  {linkableCustomers.length === 0 && (
+                    <p className="text-sm text-slate-500">No linkable customers found.</p>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  Customers whose meters this monitor tracks. At least one required.
+                </p>
+              </div>
+            </>
+          )}
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">
@@ -142,6 +243,9 @@ export default function AddCustomerForm({
         </div>
         <div className="md:col-span-2">
           <p className="text-xs text-slate-500">Use fixed amount (LBP) or percentage, not both.</p>
+          {billingType === "FIXED_MONTHLY" && (
+            <p className="text-xs text-amber-600 mt-1">Discounts are ignored for fixed monthly customers.</p>
+          )}
         </div>
         <div className="md:col-span-2">
           <label className="block text-sm font-medium text-slate-700 mb-1">Notes</label>

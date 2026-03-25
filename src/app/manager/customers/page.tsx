@@ -2,9 +2,9 @@ export const dynamic = "force-dynamic";
 
 import { Suspense } from "react";
 import Link from "next/link";
-import { getAllCustomers, getAmperePrices } from "@/lib/google-sheets";
+import { getAllBills, getAllCustomers, getAmperePrices } from "@/lib/google-sheets";
 import AddCustomerForm from "@/app/employee/customers/AddCustomerForm";
-import CustomerSearch from "@/app/employee/customers/CustomerSearch";
+import CustomerSearchWithPaidFilter from "./CustomerSearchWithPaidFilter";
 
 export default async function ManagerCustomersPage({
   searchParams,
@@ -12,7 +12,11 @@ export default async function ManagerCustomersPage({
   searchParams: Promise<{ action?: string }>;
 }) {
   const params = await searchParams;
-  const [customers, ampereTiers] = await Promise.all([getAllCustomers(), getAmperePrices()]);
+  const [customers, bills, ampereTiers] = await Promise.all([
+    getAllCustomers(),
+    getAllBills(),
+    getAmperePrices(),
+  ]);
   const showAddForm = params.action === "add";
 
   return (
@@ -31,13 +35,21 @@ export default async function ManagerCustomersPage({
 
       {showAddForm && (
         <div className="mb-8">
-          <AddCustomerForm basePath="/manager/customers" ampereTiers={ampereTiers} />
+          <AddCustomerForm
+            basePath="/manager/customers"
+            ampereTiers={ampereTiers}
+            allCustomers={customers}
+          />
         </div>
       )}
 
       <div className="mb-4">
         <Suspense fallback={<div className="h-10 bg-slate-100 rounded animate-pulse" />}>
-          <CustomerSearch initialCustomers={customers} customerLinkPath="/manager/customers" />
+          <CustomerSearchWithPaidFilter
+            initialCustomers={customers}
+            bills={bills}
+            customerLinkPath="/manager/customers"
+          />
         </Suspense>
       </div>
     </div>

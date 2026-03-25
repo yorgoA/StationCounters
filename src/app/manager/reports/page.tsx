@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { getAllBills } from "@/lib/google-sheets";
+import { getAllBills, getAllCustomers } from "@/lib/google-sheets";
 
 function formatMonthKey(monthKey: string) {
   const [year, month] = monthKey.split("-");
@@ -10,11 +10,14 @@ function formatMonthKey(monthKey: string) {
 }
 
 export default async function ManagerReportsPage() {
-  const bills = await getAllBills();
+  const [bills, customers] = await Promise.all([getAllBills(), getAllCustomers()]);
+
+  const monitorCustomerIds = new Set(customers.filter((c) => c.isMonitor).map((c) => c.customerId));
+  const payingBills = bills.filter((b) => !monitorCustomerIds.has(b.customerId));
 
   // Group bills by monthKey
   const monthBills = new Map<string, typeof bills>();
-  for (const b of bills) {
+  for (const b of payingBills) {
     const list = monthBills.get(b.monthKey) ?? [];
     list.push(b);
     monthBills.set(b.monthKey, list);

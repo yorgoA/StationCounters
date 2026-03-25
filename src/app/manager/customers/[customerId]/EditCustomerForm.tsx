@@ -22,8 +22,9 @@ export default function EditCustomerForm({
   const isFree = customer.billingType === "FREE";
   const [freeChecked, setFreeChecked] = useState(isFree);
   const [freeReason, setFreeReason] = useState(customer.freeReason ?? "");
+  const [fixedMonthlyPrice, setFixedMonthlyPrice] = useState<number>(customer.fixedMonthlyPrice ?? 0);
   const [billingType, setBillingType] = useState<BillingType>(
-    ["FREE", "AMPERE_ONLY", "KWH_ONLY", "BOTH"].includes(customer.billingType)
+    ["FREE", "AMPERE_ONLY", "KWH_ONLY", "BOTH", "FIXED_MONTHLY"].includes(customer.billingType)
       ? isFree ? "BOTH" : customer.billingType
       : "BOTH"
   );
@@ -46,7 +47,8 @@ export default function EditCustomerForm({
   const showMonitorOption =
     effectiveBillingType === "AMPERE_ONLY" ||
     effectiveBillingType === "KWH_ONLY" ||
-    effectiveBillingType === "BOTH";
+    effectiveBillingType === "BOTH" ||
+    effectiveBillingType === "FIXED_MONTHLY";
 
   const linkableCustomers = allCustomers.filter(
     (c) => c.customerId !== customer.customerId && !c.isMonitor
@@ -73,6 +75,7 @@ export default function EditCustomerForm({
       ...customer,
       subscribedAmpere,
       billingType: effectiveBillingType,
+      fixedMonthlyPrice: effectiveBillingType === "FIXED_MONTHLY" ? fixedMonthlyPrice : 0,
       fixedDiscountAmount: useAmount ? amt : 0,
       fixedDiscountPercent: useAmount ? 0 : pct,
       freeReason: freeChecked ? freeReason : "",
@@ -157,8 +160,24 @@ export default function EditCustomerForm({
             <option value="AMPERE_ONLY">Ampere Only</option>
             <option value="KWH_ONLY">kWh Only</option>
             <option value="BOTH">Both</option>
+            <option value="FIXED_MONTHLY">Fixed monthly (ma2touua)</option>
           </select>
         </div>
+        {billingType === "FIXED_MONTHLY" && (
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Fixed monthly price (LBP / month)
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              value={fixedMonthlyPrice}
+              onChange={(e) => setFixedMonthlyPrice(Number(e.target.value) || 0)}
+              required
+              className="input"
+            />
+          </div>
+        )}
         {showMonitorOption && (
           <div className="border border-slate-200 rounded-lg p-4 bg-slate-50 space-y-3">
             <label className="flex items-center gap-2 cursor-pointer">
@@ -256,6 +275,11 @@ export default function EditCustomerForm({
         </div>
       </div>
       <p className="text-xs text-slate-500">Use one or the other (amount or percentage), not both.</p>
+      {billingType === "FIXED_MONTHLY" && !freeChecked && (
+        <p className="text-xs text-amber-600">
+          Discounts are ignored for fixed monthly customers.
+        </p>
+      )}
         </>
       )}
       {error && <p className="text-red-600 text-sm">{error}</p>}

@@ -2,8 +2,9 @@ export const dynamic = "force-dynamic";
 
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { getCustomerById, getBillsByCustomer } from "@/lib/google-sheets";
+import { getAllCustomers, getBillsByCustomer, getCustomerById } from "@/lib/google-sheets";
 import EditCustomerBasicForm from "./EditCustomerBasicForm";
+import MonitorLinksForm from "./MonitorLinksForm";
 
 export default async function EmployeeCustomerDetailPage({
   params,
@@ -11,9 +12,10 @@ export default async function EmployeeCustomerDetailPage({
   params: Promise<{ customerId: string }>;
 }) {
   const { customerId } = await params;
-  const [customer, bills] = await Promise.all([
+  const [customer, bills, allCustomers] = await Promise.all([
     getCustomerById(customerId),
     getBillsByCustomer(customerId),
+    getAllCustomers(),
   ]);
 
   if (!customer) notFound();
@@ -102,6 +104,20 @@ export default async function EmployeeCustomerDetailPage({
           {bills.length === 0 && <p className="text-slate-500 py-4 text-sm">No bills yet</p>}
         </div>
       </div>
+
+      {customer.isMonitor && (
+        <div className="max-w-2xl space-y-6">
+          <div className="bg-white rounded-lg border border-slate-200 p-6">
+            <h2 className="font-semibold text-slate-800 mb-4">Monitor links</h2>
+            <MonitorLinksForm
+              monitorCustomerId={customerId}
+              initialLinkedCustomerIds={customer.linkedCustomerIds ?? []}
+              initialMonitorCategory={customer.monitorCategory ?? ""}
+              allCustomers={allCustomers}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

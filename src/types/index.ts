@@ -13,7 +13,7 @@ export interface SessionUser {
 // CUSTOMERS
 // =============================================================================
 
-export type BillingType = "AMPERE_ONLY" | "KWH_ONLY" | "BOTH" | "FREE";
+export type BillingType = "AMPERE_ONLY" | "KWH_ONLY" | "BOTH" | "FREE" | "FIXED_MONTHLY";
 export type CustomerStatus = "ACTIVE" | "INACTIVE";
 
 export interface Customer {
@@ -26,6 +26,8 @@ export interface Customer {
   apartmentNumber: string;
   subscribedAmpere: number;
   billingType: BillingType;
+  /** LBP per month (used when billingType === "FIXED_MONTHLY"). */
+  fixedMonthlyPrice: number;
   fixedDiscountAmount: number;
   fixedDiscountPercent: number; // 0–100; mutually exclusive with fixedDiscountAmount
   status: CustomerStatus;
@@ -49,10 +51,15 @@ export interface CreateCustomerInput {
   apartmentNumber: string;
   subscribedAmpere: number;
   billingType: BillingType;
+  fixedMonthlyPrice?: number;
   fixedDiscountAmount?: number;
   fixedDiscountPercent?: number;
   status?: CustomerStatus;
   notes?: string;
+  // Monitor settings (optional; only used when creating a monitor account)
+  isMonitor?: boolean;
+  linkedCustomerIds?: string[];
+  monitorCategory?: string;
 }
 
 // =============================================================================

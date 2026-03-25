@@ -167,6 +167,35 @@ async function main() {
     });
     console.log("✓ Updated Customers column R (monitorCategory)");
   }
+
+  // Column S (index 18) = fixedMonthlyPrice
+  const S_IDX = 18;
+  const needsSHeader =
+    !header[S_IDX] ||
+    header[S_IDX].toString().toLowerCase().replace(/\s/g, "") !== "fixedmonthlyprice";
+  const sValues = [];
+  if (needsSHeader) sValues.push(["fixedMonthlyPrice"]);
+  for (let i = 0; i < dataRows.length; i++) {
+    const row = dataRows[i];
+    const current = row[S_IDX];
+    const isEmpty = current === undefined || current === null || String(current).trim() === "";
+    if (isEmpty) {
+      sValues.push(["0"]);
+    } else {
+      sValues.push([String(current).trim()]);
+    }
+  }
+  const sStartRow = needsSHeader ? 1 : 2;
+  const sRange = `Customers!S${sStartRow}:S${sStartRow + sValues.length - 1}`;
+  if (sValues.length > 0) {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: sRange,
+      valueInputOption: "RAW",
+      requestBody: { values: sValues },
+    });
+    console.log("✓ Updated Customers column S (fixedMonthlyPrice)");
+  }
   console.log("");
 }
 

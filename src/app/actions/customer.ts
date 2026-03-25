@@ -16,6 +16,10 @@ export async function createCustomerAction(input: CreateCustomerInput) {
     return { error: "Unauthorized" };
   }
 
+  if (input.isMonitor && (!input.linkedCustomerIds || input.linkedCustomerIds.length === 0)) {
+    return { error: "Monitor requires at least one linked customer." };
+  }
+
   const customer: Customer = {
     customerId: generateId("cust"),
     fullName: input.fullName,
@@ -26,8 +30,12 @@ export async function createCustomerAction(input: CreateCustomerInput) {
     apartmentNumber: input.apartmentNumber,
     subscribedAmpere: input.subscribedAmpere,
     billingType: input.billingType,
+    fixedMonthlyPrice: input.fixedMonthlyPrice ?? 0,
     fixedDiscountAmount: input.fixedDiscountAmount ?? 0,
     fixedDiscountPercent: input.fixedDiscountPercent ?? 0,
+    isMonitor: input.isMonitor ?? false,
+    linkedCustomerIds: input.isMonitor ? input.linkedCustomerIds ?? [] : undefined,
+    monitorCategory: input.isMonitor ? input.monitorCategory?.trim() || undefined : undefined,
     status: input.status ?? "ACTIVE",
     notes: input.notes ?? "",
     createdAt: new Date().toISOString(),
@@ -135,6 +143,44 @@ export async function updateFreeCustomerAction(input: {
   } catch (err) {
     return {
       error: err instanceof Error ? err.message : "Failed to update",
+    };
+  }
+}
+
+export async function updateMonitorLinksAction(input: {
+  customerId: string;
+  linkedCustomerIds: string[];
+  monitorCategory?: string;
+}) {
+  const session = await getSession();
+  if (!session.isLoggedIn) {
+    return { error: "Unauthorized" };
+  }
+
+  const existing = await getCustomerById(input.customerId);
+  if (!existing) return { error: "Customer not found" };
+  if (!existing.isMonitor) return { error: "This customer is not a monitor" };
+
+  const ids = (input.linkedCustomerIds || []).map((s) => String(s).trim()).filter(Boolean);
+  if (ids.length === 0) return { error: "Monitor requires at least one linked customer." };
+
+  const updated: Customer = {
+    ...existing,
+    linkedCustomerIds: ids,
+    linkedCustomerId: undefined,
+    monitorCategory: input.monitorCategory?.trim() || undefined,
+  };
+
+  try {
+    await dbUpdateCustomer(updated);
+    revalidatePath("/employee/customers");
+    revalidatePath("/manager/customers");
+    revalidatePath(`/employee/customers/${input.customerId}`);
+    revalidatePath(`/manager/customers/${input.customerId}`);
+    return { success: true as const };
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Failed to update monitor links",
     };
   }
 }

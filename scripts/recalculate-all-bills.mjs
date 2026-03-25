@@ -79,7 +79,15 @@ function findServiceAccountJsonInProjectRoot(projectRootPath) {
 
 function normalizeBillingType(raw) {
   const t = (raw ?? "").trim().toUpperCase();
-  if (t === "AMPERE_ONLY" || t === "KWH_ONLY" || t === "BOTH" || t === "FREE") return t;
+  if (
+    t === "AMPERE_ONLY" ||
+    t === "KWH_ONLY" ||
+    t === "BOTH" ||
+    t === "FREE" ||
+    t === "FIXED_MONTHLY"
+  ) {
+    return t;
+  }
   return "BOTH";
 }
 
@@ -147,6 +155,7 @@ function calcBillFromReadings(
   currentCounter,
   subscribedAmpere,
   billingType,
+  fixedMonthlyPrice,
   fixedDiscountAmount,
   fixedDiscountPercent,
   ampereTiers,
@@ -168,6 +177,23 @@ function calcBillFromReadings(
       paymentStatus: "PAID",
     };
   }
+
+  if (billingType === "FIXED_MONTHLY") {
+    const totalDue = fixedMonthlyPrice + previousUnpaidBalance;
+    return {
+      usageKwh,
+      amperePriceSnapshot: getAmperePriceForTier(subscribedAmpere, ampereTiers),
+      kwhPriceSnapshot: kwhPrice,
+      ampereCharge: 0,
+      consumptionCharge: 0,
+      discountApplied: 0,
+      previousUnpaidBalance,
+      totalDue,
+      remainingDue: totalDue,
+      paymentStatus: calcPaymentStatus(0, totalDue),
+    };
+  }
+
   const ampereCharge = calcAmpereCharge(subscribedAmpere, ampereTiers, billingType);
   const consumptionCharge = calcConsumptionCharge(usageKwh, kwhPrice, billingType);
   const totalBeforeDiscount = calcTotalBeforeDiscount(
@@ -263,7 +289,7 @@ async function main() {
   const [billsRes, settingsRes, customersRes, ampRes] = await Promise.all([
     sheets.spreadsheets.values.get({ spreadsheetId, range: "Bills!A:R" }),
     sheets.spreadsheets.values.get({ spreadsheetId, range: "Settings!A:Z" }),
-    sheets.spreadsheets.values.get({ spreadsheetId, range: "Customers!A:R" }),
+    sheets.spreadsheets.values.get({ spreadsheetId, range: "Customers!A:S" }),
     sheets.spreadsheets.values.get({ spreadsheetId, range: "AmperePrices!A:B" }).catch(() => ({ data: { values: [] } })),
   ]);
 
@@ -321,6 +347,8 @@ async function main() {
       billingType: normalizeBillingType(r[8]),
       fixedDiscountAmount: parseFloat(r[9] || "0") || 0,
       fixedDiscountPercent: parseFloat(r[14] || "0") || 0,
+      fixedMonthlyPrice: parseFloat(r[18] || "0") || 0,
+      isMonitor: r[15] === "true" || r[15] === "1",
     });
   }
 
@@ -363,14 +391,17 @@ async function main() {
         customerMap.get(b.customerId) || {
           subscribedAmpere: 0,
           billingType: "BOTH",
+          fixedMonthlyPrice: 0,
           fixedDiscountAmount: 0,
           fixedDiscountPercent: 0,
+          isMonitor: false,
         };
 
       const others = list
         .filter((x) => x.billId !== b.billId)
         .map((x) => working.get(x.billId));
       const previousUnpaid = getPreviousUnpaidBalance(others);
+      const effectiveBillingType = cust.isMonitor ? "FREE" : cust.billingType;
 
       const calc = calcBillFromReadings(
         b.customerId,
@@ -378,7 +409,8 @@ async function main() {
         b.previousCounter,
         b.currentCounter,
         cust.subscribedAmpere,
-        cust.billingType,
+        effectiveBillingType,
+        cust.fixedMonthlyPrice,
         cust.fixedDiscountAmount,
         cust.fixedDiscountPercent,
         ampereTiers,

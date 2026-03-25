@@ -51,6 +51,7 @@ export async function createBillAction(input: CreateBillInput) {
   const [settings, ampereTiers] = await Promise.all([getSettings(), getAmperePrices()]);
   const bills = await getBillsByCustomer(input.customerId);
   const previousUnpaid = getPreviousUnpaidBalance(bills);
+  const effectiveBillingType = customer.isMonitor ? "FREE" : customer.billingType;
 
   const calc = calcBillFromReadings(
     input.customerId,
@@ -58,7 +59,8 @@ export async function createBillAction(input: CreateBillInput) {
     input.previousCounter,
     input.currentCounter,
     customer.subscribedAmpere,
-    customer.billingType,
+    effectiveBillingType,
+    customer.fixedMonthlyPrice ?? 0,
     customer.fixedDiscountAmount ?? 0,
     customer.fixedDiscountPercent ?? 0,
     ampereTiers,
@@ -107,6 +109,7 @@ export async function updateBillReadingsAction(input: UpdateBillReadingsInput) {
   const previousUnpaid = getPreviousUnpaidBalance(
     bills.filter((b) => b.billId !== input.billId)
   );
+  const effectiveBillingType = customer.isMonitor ? "FREE" : customer.billingType;
 
   const calc = calcBillFromReadings(
     bill.customerId,
@@ -114,7 +117,8 @@ export async function updateBillReadingsAction(input: UpdateBillReadingsInput) {
     input.previousCounter,
     input.currentCounter,
     customer.subscribedAmpere,
-    customer.billingType,
+    effectiveBillingType,
+    customer.fixedMonthlyPrice ?? 0,
     customer.fixedDiscountAmount ?? 0,
     customer.fixedDiscountPercent ?? 0,
     ampereTiers,
