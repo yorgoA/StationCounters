@@ -2,9 +2,9 @@ export const dynamic = "force-dynamic";
 
 import { Suspense } from "react";
 import Link from "next/link";
-import { getAllCustomers, getAmperePrices } from "@/lib/google-sheets";
+import { getAllBills, getAllCustomers, getAmperePrices } from "@/lib/google-sheets";
 import AddCustomerForm from "./AddCustomerForm";
-import CustomerSearch from "./CustomerSearch";
+import CustomerSearchWithPaidByMonth from "./CustomerSearchWithPaidByMonth";
 
 export default async function EmployeeCustomersPage({
   searchParams,
@@ -12,7 +12,7 @@ export default async function EmployeeCustomersPage({
   searchParams: Promise<{ q?: string; action?: string }>;
 }) {
   const params = await searchParams;
-  const [customers, ampereTiers] = await Promise.all([getAllCustomers(), getAmperePrices()]);
+  const [customers, bills, ampereTiers] = await Promise.all([getAllCustomers(), getAllBills(), getAmperePrices()]);
   const showAddForm = params.action === "add";
 
   return (
@@ -37,7 +37,12 @@ export default async function EmployeeCustomersPage({
 
       <div className="mb-4">
         <Suspense fallback={<div className="h-10 bg-slate-100 rounded animate-pulse" />}>
-          <CustomerSearch initialCustomers={customers} customerLinkPath="/employee/customers" showFreeFilter />
+          <CustomerSearchWithPaidByMonth
+            initialCustomers={customers}
+            bills={bills}
+            customerLinkPath="/employee/customers"
+            showFreeFilter
+          />
         </Suspense>
       </div>
     </div>
