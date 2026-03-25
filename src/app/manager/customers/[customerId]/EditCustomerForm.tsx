@@ -50,6 +50,9 @@ export default function EditCustomerForm({
     effectiveBillingType === "BOTH" ||
     effectiveBillingType === "FIXED_MONTHLY";
 
+  const showSubscribedAmpere = !monitorChecked && billingType !== "FIXED_MONTHLY";
+  const showFixedDiscountFields = !monitorChecked && billingType !== "FIXED_MONTHLY";
+
   const linkableCustomers = allCustomers.filter(
     (c) => c.customerId !== customer.customerId && !c.isMonitor
   );
@@ -95,20 +98,22 @@ export default function EditCustomerForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 max-w-md">
-      <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1">Subscribed Ampere</label>
-        <select
-          value={subscribedAmpere}
-          onChange={(e) => setSubscribedAmpere(Number(e.target.value))}
-          className="input"
-        >
-          {ampereTiers.map((t) => (
-            <option key={t.amp} value={t.amp}>
-              {t.amp}A
-            </option>
-          ))}
-        </select>
-      </div>
+      {showSubscribedAmpere && (
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Subscribed Ampere</label>
+          <select
+            value={subscribedAmpere}
+            onChange={(e) => setSubscribedAmpere(Number(e.target.value))}
+            className="input"
+          >
+            {ampereTiers.map((t) => (
+              <option key={t.amp} value={t.amp}>
+                {t.amp}A
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       <div>
         <label className="flex items-center gap-2 cursor-pointer">
           <input
@@ -163,7 +168,7 @@ export default function EditCustomerForm({
             <option value="FIXED_MONTHLY">Fixed monthly (ma2touua)</option>
           </select>
         </div>
-        {billingType === "FIXED_MONTHLY" && (
+        {billingType === "FIXED_MONTHLY" && !monitorChecked && (
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">
               Fixed monthly price (LBP / month)
@@ -238,44 +243,48 @@ export default function EditCustomerForm({
             )}
           </div>
         )}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
-            Fixed Discount (LBP)
-          </label>
-          <input
-            type="number"
-            step="0.01"
-            value={fixedDiscountAmount}
-            onChange={(e) => {
-              setFixedDiscountAmount(e.target.value);
-              if (e.target.value && parseFloat(e.target.value) > 0) setFixedDiscountPercent("");
-            }}
-            placeholder="e.g. 5000"
-            className="input"
-          />
+      {showFixedDiscountFields && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Fixed Discount (LBP)
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              value={fixedDiscountAmount}
+              onChange={(e) => {
+                setFixedDiscountAmount(e.target.value);
+                if (e.target.value && parseFloat(e.target.value) > 0)
+                  setFixedDiscountPercent("");
+              }}
+              placeholder="e.g. 5000"
+              className="input"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Fixed Discount (%)
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              max="100"
+              value={fixedDiscountPercent}
+              onChange={(e) => {
+                setFixedDiscountPercent(e.target.value);
+                if (e.target.value && parseFloat(e.target.value) > 0)
+                  setFixedDiscountAmount("");
+              }}
+              placeholder="e.g. 10"
+              className="input"
+            />
+          </div>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
-            Fixed Discount (%)
-          </label>
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            max="100"
-            value={fixedDiscountPercent}
-            onChange={(e) => {
-              setFixedDiscountPercent(e.target.value);
-              if (e.target.value && parseFloat(e.target.value) > 0) setFixedDiscountAmount("");
-            }}
-            placeholder="e.g. 10"
-            className="input"
-          />
-        </div>
-      </div>
+      )}
       <p className="text-xs text-slate-500">Use one or the other (amount or percentage), not both.</p>
-      {billingType === "FIXED_MONTHLY" && !freeChecked && (
+      {billingType === "FIXED_MONTHLY" && !freeChecked && !monitorChecked && (
         <p className="text-xs text-amber-600">
           Discounts are ignored for fixed monthly customers.
         </p>

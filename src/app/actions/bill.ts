@@ -11,6 +11,8 @@ import {
   getSettings,
   getAmperePrices,
   getCustomerById,
+  deleteBillById,
+  deletePaymentsByBillId,
 } from "@/lib/google-sheets";
 import { generateId } from "@/lib/id";
 import {
@@ -158,6 +160,36 @@ export async function updateBillReadingsAction(input: UpdateBillReadingsInput) {
   } catch (err) {
     return {
       error: err instanceof Error ? err.message : "Failed to update bill",
+    };
+  }
+}
+
+export async function deleteBillAction(input: { billId: string }) {
+  const session = await getSession();
+  if (!session.isLoggedIn || session.role !== "manager") {
+    return { error: "Only manager can delete bills" };
+  }
+
+  const allBills = await getAllBills();
+  const bill = allBills.find((b) => b.billId === input.billId);
+  if (!bill) {
+    return { error: "Bill not found" };
+  }
+
+  try {
+    // Remove linked payments first to prevent orphan payment rows.
+    await deletePaymentsByBillId(input.billId);
+    await deleteBillById(input.billId);
+
+    revalidatePath("/employee");
+    revalidatePath("/manager");
+    revalidatePath("/manager/bills");
+    revalidatePath(`/manager/customers/${bill.customerId}`);
+    revalidatePath(`/employee/customers/${bill.customerId}`);
+    return { success: true as const };
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Failed to delete bill",
     };
   }
 }

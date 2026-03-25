@@ -34,6 +34,10 @@ export default function AddCustomerForm({
 
   const linkableCustomers = allCustomers.filter((c) => !c.isMonitor);
 
+  const showSubscribedAmpere = !monitorChecked && billingType !== "FIXED_MONTHLY";
+  const showFixedDiscountFields = !monitorChecked && billingType !== "FIXED_MONTHLY";
+  const showFixedMonthlyPrice = billingType === "FIXED_MONTHLY" && !monitorChecked;
+
   function toggleLinked(id: string) {
     setLinkedCustomerIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
@@ -105,21 +109,23 @@ export default function AddCustomerForm({
           <label className="block text-sm font-medium text-slate-700 mb-1">Apartment</label>
           <input name="apartmentNumber" className="input" />
         </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Subscribed Ampere *</label>
-          <select
-            name="subscribedAmpere"
-            required
-            className="input"
-            defaultValue={ampereTiers.find((t) => t.amp === 10)?.amp ?? ampereTiers[0]?.amp}
-          >
-            {ampereTiers.map((t) => (
-              <option key={t.amp} value={t.amp}>
-                {t.amp}A
-              </option>
-            ))}
-          </select>
-        </div>
+        {showSubscribedAmpere && (
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Subscribed Ampere *</label>
+            <select
+              name="subscribedAmpere"
+              required
+              className="input"
+              defaultValue={ampereTiers.find((t) => t.amp === 10)?.amp ?? ampereTiers[0]?.amp}
+            >
+              {ampereTiers.map((t) => (
+                <option key={t.amp} value={t.amp}>
+                  {t.amp}A
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">Billing Type</label>
           <select
@@ -135,7 +141,7 @@ export default function AddCustomerForm({
             <option value="FIXED_MONTHLY">Fixed monthly (ma2touua)</option>
           </select>
         </div>
-        {billingType === "FIXED_MONTHLY" && (
+        {showFixedMonthlyPrice && (
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">
               Fixed monthly price (LBP / month)
@@ -213,37 +219,41 @@ export default function AddCustomerForm({
             </>
           )}
         </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
-            Fixed Discount (LBP)
-          </label>
-          <input
-            name="fixedDiscountAmount"
-            type="number"
-            step="0.01"
-            defaultValue={0}
-            placeholder="e.g. 5000"
-            className="input"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
-            Fixed Discount (%)
-          </label>
-          <input
-            name="fixedDiscountPercent"
-            type="number"
-            step="0.01"
-            min={0}
-            max={100}
-            defaultValue={0}
-            placeholder="e.g. 10"
-            className="input"
-          />
-        </div>
+        {showFixedDiscountFields && (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Fixed Discount (LBP)
+              </label>
+              <input
+                name="fixedDiscountAmount"
+                type="number"
+                step="0.01"
+                defaultValue={0}
+                placeholder="e.g. 5000"
+                className="input"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Fixed Discount (%)
+              </label>
+              <input
+                name="fixedDiscountPercent"
+                type="number"
+                step="0.01"
+                min={0}
+                max={100}
+                defaultValue={0}
+                placeholder="e.g. 10"
+                className="input"
+              />
+            </div>
+          </>
+        )}
         <div className="md:col-span-2">
           <p className="text-xs text-slate-500">Use fixed amount (LBP) or percentage, not both.</p>
-          {billingType === "FIXED_MONTHLY" && (
+          {billingType === "FIXED_MONTHLY" && !monitorChecked && (
             <p className="text-xs text-amber-600 mt-1">Discounts are ignored for fixed monthly customers.</p>
           )}
         </div>

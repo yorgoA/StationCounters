@@ -183,6 +183,61 @@ export async function createPayment(payment: Payment): Promise<void> {
 }
 
 // -----------------------------------------------------------------------------
+// DELETION (Bills + linked Payments)
+// -----------------------------------------------------------------------------
+
+async function getSheetIdByTitle(sheetTitle: string): Promise<number> {
+  const { sheets, spreadsheetId } = await getSheets();
+  const meta = await sheets.spreadsheets.get({ spreadsheetId });
+  const sheet = meta.data.sheets?.find((s) => s.properties?.title === sheetTitle);
+  const sheetId = sheet?.properties?.sheetId;
+  if (typeof sheetId !== "number") {
+    throw new Error(`Sheet not found: ${sheetTitle}`);
+  }
+  return sheetId;
+}
+
+async function deleteRowsByIndices(sheetTitle: string, rowIndices0Based: number[]) {
+  if (rowIndices0Based.length === 0) return;
+  const { sheets, spreadsheetId } = await getSheets();
+  const sheetId = await getSheetIdByTitle(sheetTitle);
+
+  const sorted = [...rowIndices0Based].sort((a, b) => b - a);
+  const requests = sorted.map((startIndex) => ({
+    deleteDimension: {
+      range: { sheetId, dimension: "ROWS", startIndex, endIndex: startIndex + 1 },
+    },
+  }));
+
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: { requests },
+  });
+}
+
+export async function deletePaymentsByBillId(billId: string): Promise<void> {
+  const rows = await getRange(SHEET_NAMES.PAYMENTS);
+  if (rows.length < 2) return;
+
+  // values are 1-based in sheets; getRange returns an array where index 0 is row 1 (header).
+  const rowIndices0Based = rows
+    .map((r, i) => (i > 0 && r[1] === billId ? i : -1))
+    .filter((i) => i >= 0);
+
+  await deleteRowsByIndices(SHEET_NAMES.PAYMENTS, rowIndices0Based);
+}
+
+export async function deleteBillById(billId: string): Promise<void> {
+  const rows = await getRange(SHEET_NAMES.BILLS);
+  if (rows.length < 2) throw new Error("Bill not found");
+
+  const idx = rows.findIndex((r, i) => i > 0 && r[0] === billId);
+  if (idx === -1) throw new Error("Bill not found");
+
+  await deleteRowsByIndices(SHEET_NAMES.BILLS, [idx]);
+}
+
+// -----------------------------------------------------------------------------
 // SETTINGS
 // -----------------------------------------------------------------------------
 
