@@ -108,7 +108,10 @@ export default async function ManagerDashboardPage({
   const customersExclMonitors = customers.filter((c) => !c.isMonitor);
   const activeCustomers = customersExclMonitors.filter((c) => c.status === "ACTIVE");
   const payingActiveCustomers = activeCustomers.filter(
-    (c) => c.billingType !== "FREE" && !c.isMonitor
+    (c) =>
+      c.billingType !== "FREE" &&
+      c.billingType !== "FIXED_MONTHLY" &&
+      !c.isMonitor
   );
   const freeCustomers = customers.filter((c) => c.billingType === "FREE");
   const customersWithReadings = new Set(monthBills.map((b) => b.customerId));
@@ -387,7 +390,9 @@ export default async function ManagerDashboardPage({
           Missing Meter Readings
         </h2>
         <p className="text-sm text-slate-500 mb-4">
-          Paying customers with no meter reading for {formatMonthKey(monthKey)}.
+          Paying meter-based customers with no reading recorded for{" "}
+          {formatMonthKey(monthKey)}. Fixed monthly (ma2touua) customers are not listed
+          here.
         </p>
         {customersWithoutReading.length > 0 ? (
           <ul className="space-y-1 max-h-64 overflow-y-auto">
