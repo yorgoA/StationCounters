@@ -1,0 +1,107 @@
+import { calcBillFromReadings } from "@/lib/billing";
+import { createBill, getAllBills, getAllCustomers, getAmperePrices, getKwhPriceForMonth } from "@/lib/google-sheets";
+import { generateId } from "@/lib/id";
+import type { Bill, Customer } from "@/types";
+
+type EnsureResult = { created: number };
+
+const CHECK_TTL_MS = 60_000;
+const recentChecks = new Map<string, number>();
+const inflightChecks = new Map<string, Promise<EnsureResult>>();
+
+function getPreviousUnpaidBalance(bills: Bill[]): number {
+  const unpaid = bills
+    .filter((b) => b.paymentStatus === "UNPAID" || b.paymentStatus === "PARTIAL")
+    .sort((a, b) => b.monthKey.localeCompare(a.monthKey));
+  return unpaid[0]?.remainingDue ?? 0;
+}
+
+function latestCounterForCustomer(bills: Bill[], customerId: string): number {
+  const latest = bills
+    .filter((b) => b.customerId === customerId)
+    .sort((a, b) => b.monthKey.localeCompare(a.monthKey))[0];
+  return latest?.currentCounter ?? 0;
+}
+
+function isEligibleFixedMonthly(customer: Customer): boolean {
+  return (
+    customer.billingType === "FIXED_MONTHLY" &&
+    customer.status === "ACTIVE" &&
+    !customer.isMonitor
+  );
+}
+
+export async function ensureFixedMonthlyBillsForMonth(monthKey: string): Promise<EnsureResult> {
+  if (!/^\d{4}-\d{2}$/.test(monthKey)) return { created: 0 };
+
+  const now = Date.now();
+  const checkedAt = recentChecks.get(monthKey) ?? 0;
+  if (now - checkedAt < CHECK_TTL_MS) return { created: 0 };
+
+  const inflight = inflightChecks.get(monthKey);
+  if (inflight) return inflight;
+
+  const run = (async (): Promise<EnsureResult> => {
+    const [customers, bills, kwhPrice, ampereTiers] = await Promise.all([
+      getAllCustomers(),
+      getAllBills(),
+      getKwhPriceForMonth(monthKey),
+      getAmperePrices(),
+    ]);
+
+    const existingForMonth = new Set(
+      bills.filter((b) => b.monthKey === monthKey).map((b) => b.customerId)
+    );
+
+    const fixedMonthlyCustomers = customers.filter(isEligibleFixedMonthly);
+    let created = 0;
+
+    // Sequential writes are safer for Sheets API quotas.
+    for (const customer of fixedMonthlyCustomers) {
+      if (existingForMonth.has(customer.customerId)) continue;
+
+      const previousCounter = latestCounterForCustomer(bills, customer.customerId);
+      const previousUnpaid = getPreviousUnpaidBalance(
+        bills.filter((b) => b.customerId === customer.customerId)
+      );
+
+      const calc = calcBillFromReadings(
+        customer.customerId,
+        monthKey,
+        previousCounter,
+        previousCounter,
+        customer.subscribedAmpere,
+        customer.billingType,
+        customer.fixedMonthlyPrice ?? 0,
+        customer.fixedDiscountAmount ?? 0,
+        customer.fixedDiscountPercent ?? 0,
+        ampereTiers,
+        kwhPrice,
+        previousUnpaid
+      );
+
+      const bill: Bill = {
+        ...calc,
+        billId: generateId("bill"),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await createBill(bill);
+      created++;
+      existingForMonth.add(customer.customerId);
+      bills.push(bill);
+    }
+
+    recentChecks.set(monthKey, Date.now());
+    return { created };
+  })();
+
+  inflightChecks.set(monthKey, run);
+  try {
+    return await run;
+  } finally {
+    inflightChecks.delete(monthKey);
+  }
+}
+

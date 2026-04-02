@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { getAllBills, getAllCustomers } from "@/lib/google-sheets";
+import { ensureFixedMonthlyBillsForMonth } from "@/lib/fixed-monthly-auto-billing";
 import BillsMonthSelect from "./BillsMonthSelect";
 
 function getCurrentMonthKey() {
@@ -15,6 +16,7 @@ export default async function ManagerBillsPage({
 }) {
   const params = await searchParams;
   const monthKey = params.month || getCurrentMonthKey();
+  await ensureFixedMonthlyBillsForMonth(monthKey);
   const [bills, customers] = await Promise.all([getAllBills(), getAllCustomers()]);
 
   const monitorCustomerIds = new Set(customers.filter((c) => c.isMonitor).map((c) => c.customerId));

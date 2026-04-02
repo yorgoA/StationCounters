@@ -7,6 +7,7 @@ import {
   getAmperePrices,
   getKwhPriceForMonth,
 } from "@/lib/google-sheets";
+import { ensureFixedMonthlyBillsForMonth } from "@/lib/fixed-monthly-auto-billing";
 import { getAmperePriceForTier } from "@/lib/billing";
 import Link from "next/link";
 import DashboardMonthSelect from "./DashboardMonthSelect";
@@ -36,6 +37,9 @@ export default async function ManagerDashboardPage({
   searchParams: Promise<{ month?: string }>;
 }) {
   const params = await searchParams;
+  const monthKey = params.month || getPreviousMonthKey();
+  await ensureFixedMonthlyBillsForMonth(monthKey);
+
   const [customers, bills, settings, ampereTiers] = await Promise.all([
     getAllCustomers(),
     getAllBills(),
@@ -44,7 +48,6 @@ export default async function ManagerDashboardPage({
   ]);
 
   // Default to previous month (billing period - you collect for Feb during March)
-  const monthKey = params.month || getPreviousMonthKey();
   const monthKwhPrice = await getKwhPriceForMonth(monthKey);
   const monthBills = bills.filter((b) => b.monthKey === monthKey);
 

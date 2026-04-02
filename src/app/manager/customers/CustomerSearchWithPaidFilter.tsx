@@ -27,6 +27,7 @@ export default function CustomerSearchWithPaidFilter({
   const [monthKey, setMonthKey] = useState(defaultMonthKey);
   const [boxFilter, setBoxFilter] = useState("");
   const [buildingFilter, setBuildingFilter] = useState("");
+  const [billingTypeFilter, setBillingTypeFilter] = useState("");
 
   const billByCustomerAndMonth = useMemo(() => {
     const map = new Map<string, Bill>();
@@ -61,6 +62,7 @@ export default function CustomerSearchWithPaidFilter({
     }
     if (boxFilter) list = list.filter((c) => c.area === boxFilter);
     if (buildingFilter) list = list.filter((c) => c.building === buildingFilter);
+    if (billingTypeFilter) list = list.filter((c) => c.billingType === billingTypeFilter);
     if (!q.trim()) return list;
 
     const lower = q.toLowerCase();
@@ -72,7 +74,16 @@ export default function CustomerSearchWithPaidFilter({
         (c.building && c.building.toLowerCase().includes(lower))
       );
     });
-  }, [initialCustomers, paidOnly, monthKey, q, boxFilter, buildingFilter, billByCustomerAndMonth]);
+  }, [
+    initialCustomers,
+    paidOnly,
+    monthKey,
+    q,
+    boxFilter,
+    buildingFilter,
+    billingTypeFilter,
+    billByCustomerAndMonth,
+  ]);
 
   return (
     <>
@@ -108,6 +119,19 @@ export default function CustomerSearchWithPaidFilter({
               {b}
             </option>
           ))}
+        </select>
+
+        <select
+          value={billingTypeFilter}
+          onChange={(e) => setBillingTypeFilter(e.target.value)}
+          className="rounded-lg border border-slate-300 px-3 py-2 text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+        >
+          <option value="">All billing types</option>
+          <option value="BOTH">BOTH</option>
+          <option value="KWH_ONLY">KWH_ONLY</option>
+          <option value="AMPERE_ONLY">AMPERE_ONLY</option>
+          <option value="FIXED_MONTHLY">FIXED_MONTHLY</option>
+          <option value="FREE">FREE</option>
         </select>
 
         <div className="flex items-center gap-2 ml-auto">
@@ -195,7 +219,9 @@ export default function CustomerSearchWithPaidFilter({
 
         {filtered.length === 0 && (
           <p className="text-center text-slate-500 py-12">
-            {q.trim() || boxFilter || buildingFilter || paidOnly ? "No customers match your filters" : "No customers yet"}
+            {q.trim() || boxFilter || buildingFilter || billingTypeFilter || paidOnly
+              ? "No customers match your filters"
+              : "No customers yet"}
           </p>
         )}
       </div>
