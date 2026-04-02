@@ -21,7 +21,8 @@
     "verify-sheet": "node scripts/verify-sheet-structure.mjs",
     "verify-receipt-folder": "node scripts/verify-receipt-folder.mjs",
     "delete-blob": "node scripts/delete-blob.mjs",
-    "set-billing": "node scripts/set-customer-billing.mjs"
+    "set-billing": "node scripts/set-customer-billing.mjs",
+    "set-month-kwh": "node scripts/set-month-kwh-price.mjs"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",

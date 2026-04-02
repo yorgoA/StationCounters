@@ -5,7 +5,6 @@ import Link from "next/link";
 import {
   getCustomerById,
   getBillsByCustomer,
-  getSettings,
   getAmperePrices,
 } from "@/lib/google-sheets";
 import { getAmperePriceForTier } from "@/lib/billing";
@@ -23,19 +22,17 @@ export default async function FreeCustomerDetailPage({
   params: Promise<{ customerId: string }>;
 }) {
   const { customerId } = await params;
-  const [customer, bills, settings, ampereTiers] = await Promise.all([
+  const [customer, bills, ampereTiers] = await Promise.all([
     getCustomerById(customerId),
     getBillsByCustomer(customerId),
-    getSettings(),
     getAmperePrices(),
   ]);
 
   if (!customer || customer.billingType !== "FREE") notFound();
 
-  const kwhPrice = settings.kwhPrice || 0;
   const totalKwh = bills.reduce((s, b) => s + b.usageKwh, 0);
   const amountWaived = bills.reduce((s, b) => {
-    const consumption = b.usageKwh * kwhPrice;
+    const consumption = b.usageKwh * (b.kwhPriceSnapshot || 0);
     const ampere = getAmperePriceForTier(customer.subscribedAmpere, ampereTiers);
     return s + consumption + ampere;
   }, 0);
@@ -140,7 +137,7 @@ export default async function FreeCustomerDetailPage({
                 {[...bills]
                   .sort((a, b) => b.monthKey.localeCompare(a.monthKey))
                   .map((b) => {
-                    const consumption = b.usageKwh * kwhPrice;
+                    const consumption = b.usageKwh * (b.kwhPriceSnapshot || 0);
                     const ampere = getAmperePriceForTier(
                       customer.subscribedAmpere,
                       ampereTiers

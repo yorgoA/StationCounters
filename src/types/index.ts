@@ -138,3 +138,9 @@ export interface Settings {
   currency: string;
   updatedAt: string;
 }
+
+export interface MonthlyTariff {
+  monthKey: string; // e.g. "2026-03"
+  kwhPrice: number;
+  updatedAt: string;
+}

@@ -1,6 +1,12 @@
 export const dynamic = "force-dynamic";
 
-import { getAllCustomers, getAllBills, getSettings, getAmperePrices } from "@/lib/google-sheets";
+import {
+  getAllCustomers,
+  getAllBills,
+  getSettings,
+  getAmperePrices,
+  getKwhPriceForMonth,
+} from "@/lib/google-sheets";
 import { getAmperePriceForTier } from "@/lib/billing";
 import Link from "next/link";
 import DashboardMonthSelect from "./DashboardMonthSelect";
@@ -39,6 +45,7 @@ export default async function ManagerDashboardPage({
 
   // Default to previous month (billing period - you collect for Feb during March)
   const monthKey = params.month || getPreviousMonthKey();
+  const monthKwhPrice = await getKwhPriceForMonth(monthKey);
   const monthBills = bills.filter((b) => b.monthKey === monthKey);
 
   const billMonths = Array.from(new Set(bills.map((b) => b.monthKey)));
@@ -90,7 +97,7 @@ export default async function ManagerDashboardPage({
   const totalKwhPaying = payingBills.reduce((s, b) => s + b.usageKwh, 0);
   const totalKwhInclFree = monthBills.reduce((s, b) => s + b.usageKwh, 0);
   const totalKwhAllTime = bills.reduce((s, b) => s + b.usageKwh, 0);
-  const kwhPrice = settings.kwhPrice || 0;
+  const kwhPrice = monthKwhPrice || settings.kwhPrice || 0;
   const consumptionExpectedInclFree =
     kwhPrice > 0 ? Math.round(totalKwhInclFree * kwhPrice) : 0;
 

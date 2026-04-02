@@ -1,11 +1,15 @@
 export const dynamic = "force-dynamic";
 
-import { getSettings, getAmperePrices } from "@/lib/google-sheets";
+import { getSettings, getAmperePrices, getMonthlyTariffs } from "@/lib/google-sheets";
 import SettingsForm from "./SettingsForm";
 import AmperePricesForm from "./AmperePricesForm";
 
 export default async function ManagerSettingsPage() {
-  const [settings, amperePrices] = await Promise.all([getSettings(), getAmperePrices()]);
+  const [settings, amperePrices, monthlyTariffs] = await Promise.all([
+    getSettings(),
+    getAmperePrices(),
+    getMonthlyTariffs(),
+  ]);
 
   return (
     <div className="space-y-8">
@@ -23,9 +27,10 @@ export default async function ManagerSettingsPage() {
         <div className="bg-white rounded-lg border border-slate-200 p-6">
           <h2 className="font-semibold text-slate-800 mb-4">Other Settings</h2>
           <p className="text-sm text-slate-500 mb-4">
-            kWh price applies to consumption. Currency is fixed to LBP.
+            Set a monthly kWh tariff by month. Global kWh price is fallback for months with
+            no monthly tariff.
           </p>
-          <SettingsForm initialSettings={settings} />
+          <SettingsForm initialSettings={settings} monthlyTariffs={monthlyTariffs} />
         </div>
       </div>
     </div>

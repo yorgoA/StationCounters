@@ -8,7 +8,7 @@ import {
   updateBill as dbUpdateBill,
   getBillsByCustomer,
   getAllBills,
-  getSettings,
+  getKwhPriceForMonth,
   getAmperePrices,
   getCustomerById,
   deleteBillById,
@@ -50,7 +50,10 @@ export async function createBillAction(input: CreateBillInput) {
     return { error: "Customer not found" };
   }
 
-  const [settings, ampereTiers] = await Promise.all([getSettings(), getAmperePrices()]);
+  const [kwhPrice, ampereTiers] = await Promise.all([
+    getKwhPriceForMonth(input.monthKey),
+    getAmperePrices(),
+  ]);
   const bills = await getBillsByCustomer(input.customerId);
   const previousUnpaid = getPreviousUnpaidBalance(bills);
   const effectiveBillingType = customer.isMonitor ? "FREE" : customer.billingType;
@@ -66,7 +69,7 @@ export async function createBillAction(input: CreateBillInput) {
     customer.fixedDiscountAmount ?? 0,
     customer.fixedDiscountPercent ?? 0,
     ampereTiers,
-    settings.kwhPrice,
+    kwhPrice,
     previousUnpaid
   );
 
@@ -106,7 +109,10 @@ export async function updateBillReadingsAction(input: UpdateBillReadingsInput) {
   const customer = await getCustomerById(bill.customerId);
   if (!customer) return { error: "Customer not found" };
 
-  const [settings, ampereTiers] = await Promise.all([getSettings(), getAmperePrices()]);
+  const [kwhPrice, ampereTiers] = await Promise.all([
+    getKwhPriceForMonth(bill.monthKey),
+    getAmperePrices(),
+  ]);
   const bills = await getBillsByCustomer(bill.customerId);
   const previousUnpaid = getPreviousUnpaidBalance(
     bills.filter((b) => b.billId !== input.billId)
@@ -124,7 +130,7 @@ export async function updateBillReadingsAction(input: UpdateBillReadingsInput) {
     customer.fixedDiscountAmount ?? 0,
     customer.fixedDiscountPercent ?? 0,
     ampereTiers,
-    settings.kwhPrice,
+    kwhPrice,
     previousUnpaid
   );
 

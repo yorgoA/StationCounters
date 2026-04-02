@@ -16,10 +16,19 @@ import {
   amperePriceTierToRow,
   billToRow,
   customerToRow,
+  monthlyTariffToRow,
   paymentToRow,
+  rowToMonthlyTariff,
   settingsToRow,
 } from "./sheets-utils";
-import type { AmperePriceTier, Bill, Customer, Payment, Settings } from "@/types";
+import type {
+  AmperePriceTier,
+  Bill,
+  Customer,
+  MonthlyTariff,
+  Payment,
+  Settings,
+} from "@/types";
 
 const SHEET_NAMES = {
   AMPERE_PRICES: "AmperePrices",
@@ -27,6 +36,7 @@ const SHEET_NAMES = {
   BILLS: "Bills",
   PAYMENTS: "Payments",
   SETTINGS: "Settings",
+  MONTHLY_TARIFFS: "MonthlyTariffs",
 } as const;
 
 const DEFAULT_AMPERE_PRICES: AmperePriceTier[] = [
@@ -253,6 +263,25 @@ export async function getSettings(): Promise<Settings> {
   return rowToSettings(rows[1]);
 }
 
+export async function getMonthlyTariffs(): Promise<MonthlyTariff[]> {
+  try {
+    const rows = await getRange(SHEET_NAMES.MONTHLY_TARIFFS);
+    if (rows.length < 2) return [];
+    return rows.slice(1).map(rowToMonthlyTariff).filter((t) => t.monthKey);
+  } catch {
+    // sheet may not exist yet
+    return [];
+  }
+}
+
+export async function getKwhPriceForMonth(monthKey: string): Promise<number> {
+  const tariffs = await getMonthlyTariffs();
+  const exact = tariffs.find((t) => t.monthKey === monthKey);
+  if (exact) return exact.kwhPrice;
+  const settings = await getSettings();
+  return settings.kwhPrice || 0;
+}
+
 export async function getAmperePrices(): Promise<AmperePriceTier[]> {
   try {
     const rows = await getRange(SHEET_NAMES.AMPERE_PRICES);
@@ -301,5 +330,52 @@ export async function updateSettings(settings: Settings): Promise<void> {
     await appendRow(SHEET_NAMES.SETTINGS, settingsToRow(settings));
   } else {
     await updateRow(SHEET_NAMES.SETTINGS, 2, settingsToRow(settings));
+  }
+}
+
+export async function upsertMonthlyTariff(monthKey: string, kwhPrice: number): Promise<void> {
+  const { sheets, spreadsheetId } = await getSheets();
+  const cleanMonthKey = String(monthKey || "").trim();
+  if (!cleanMonthKey) throw new Error("monthKey is required (YYYY-MM)");
+
+  // Create MonthlyTariffs sheet if it doesn't exist
+  const meta = await sheets.spreadsheets.get({ spreadsheetId });
+  const hasSheet = meta.data.sheets?.some(
+    (s) => s.properties?.title === SHEET_NAMES.MONTHLY_TARIFFS
+  );
+  if (!hasSheet) {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        requests: [
+          {
+            addSheet: {
+              properties: { title: SHEET_NAMES.MONTHLY_TARIFFS },
+            },
+          },
+        ],
+      },
+    });
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `${SHEET_NAMES.MONTHLY_TARIFFS}!A1`,
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values: [["monthKey", "kwhPrice", "updatedAt"]] },
+    });
+  }
+
+  const rows = await getRange(SHEET_NAMES.MONTHLY_TARIFFS, "A:C");
+  const idx = rows.findIndex(
+    (r, i) => i > 0 && String(r[0] ?? "").trim() === cleanMonthKey
+  );
+  const row = monthlyTariffToRow({
+    monthKey: cleanMonthKey,
+    kwhPrice: Math.round(Number(kwhPrice) || 0),
+    updatedAt: new Date().toISOString(),
+  });
+  if (idx === -1) {
+    await appendRow(SHEET_NAMES.MONTHLY_TARIFFS, row);
+  } else {
+    await updateRow(SHEET_NAMES.MONTHLY_TARIFFS, idx + 1, row);
   }
 }
