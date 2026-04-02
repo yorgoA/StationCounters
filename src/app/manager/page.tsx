@@ -31,6 +31,13 @@ function formatMonthKey(monthKey: string) {
   return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
 }
 
+function monthKeyFromDate(iso: string | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
 export default async function ManagerDashboardPage({
   searchParams,
 }: {
@@ -159,7 +166,13 @@ export default async function ManagerDashboardPage({
   const freeCustomers = customers.filter((c) => c.billingType === "FREE");
   const customersWithReadings = new Set(monthBills.map((b) => b.customerId));
   const customersWithoutReading = payingActiveCustomers.filter(
-    (c) => !customersWithReadings.has(c.customerId)
+    (c) => {
+      if (customersWithReadings.has(c.customerId)) return false;
+      // Hide newly created customers (created after the selected month).
+      const createdMonthKey = monthKeyFromDate(c.createdAt);
+      if (!createdMonthKey) return true;
+      return createdMonthKey <= monthKey;
+    }
   );
 
   const totalMonitorKwh = monitorBillsThisMonth.reduce((s, b) => s + b.usageKwh, 0);
