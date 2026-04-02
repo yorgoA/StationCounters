@@ -70,11 +70,11 @@ export default async function ManagerKwhPage({
   const customerMap = new Map(customers.map((c) => [c.customerId, c]));
   const activeCustomers = customers.filter((c) => c.status === "ACTIVE");
   const monitorIds = new Set(activeCustomers.filter((c) => c.isMonitor).map((c) => c.customerId));
+  const freeIds = new Set(
+    customers.filter((c) => c.billingType === "FREE" && !c.isMonitor).map((c) => c.customerId)
+  );
   const payingBills = monthBills.filter((b) => !isExcludedFromCollection(b, customerMap.get(b.customerId)));
-  const freeBills = monthBills.filter((b) => {
-    const customer = customerMap.get(b.customerId);
-    return !customer?.isMonitor && isExcludedFromCollection(b, customer);
-  });
+  const freeBills = monthBills.filter((b) => freeIds.has(b.customerId));
 
   const payingKwh = payingBills.reduce((s, b) => s + b.usageKwh, 0);
   const fromAmpere = payingBills.reduce((s, b) => s + b.ampereCharge, 0);

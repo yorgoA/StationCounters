@@ -87,6 +87,9 @@ export default async function ManagerDashboardPage({
 
   const customerMap = new Map(customers.map((c) => [c.customerId, c]));
   const monitorIds = new Set(customers.filter((c) => c.isMonitor).map((c) => c.customerId));
+  const freeIds = new Set(
+    customers.filter((c) => c.billingType === "FREE" && !c.isMonitor).map((c) => c.customerId)
+  );
 
   const currentPayingBills = monthBills.filter((b) => !isExcludedFromCollection(b, customerMap.get(b.customerId)));
   const previousPayingBills = bills.filter(
@@ -105,10 +108,7 @@ export default async function ManagerDashboardPage({
   const unpaidTillToday = unpaidCurrentMonth + previousUnpaid;
   const payingKwh = currentPayingBills.reduce((s, b) => s + b.usageKwh, 0);
   const freeKwh = monthBills
-    .filter((b) => {
-      const customer = customerMap.get(b.customerId);
-      return !customer?.isMonitor && isExcludedFromCollection(b, customer);
-    })
+    .filter((b) => freeIds.has(b.customerId))
     .reduce((s, b) => s + b.usageKwh, 0);
   const kwhPrice = monthKwhPrice > 0 ? monthKwhPrice : settings.kwhPrice;
   const billByCustomer = new Map(monthBills.map((b) => [b.customerId, b]));

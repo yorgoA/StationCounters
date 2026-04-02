@@ -22,6 +22,7 @@
     "verify-receipt-folder": "node scripts/verify-receipt-folder.mjs",
     "delete-blob": "node scripts/delete-blob.mjs",
     "set-billing": "node scripts/set-customer-billing.mjs",
+    "check-kwh-metrics": "node scripts/check-kwh-metrics.mjs",
     "set-month-kwh": "node scripts/set-month-kwh-price.mjs",
     "repair-customer-chain": "node scripts/repair-customer-billing-chain.mjs"
   },
