@@ -346,6 +346,7 @@ export async function getSettings(): Promise<Settings> {
     return {
       kwhPrice: 0,
       currency: "LBP",
+      usdRate: 89700,
       updatedAt: new Date().toISOString(),
     };
   }

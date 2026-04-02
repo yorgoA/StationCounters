@@ -11,7 +11,9 @@ import {
 } from "@/lib/google-sheets";
 import type { AmperePriceTier, Settings } from "@/types";
 
-export async function updateSettingsAction(settings: Partial<Pick<Settings, "kwhPrice" | "currency">>) {
+export async function updateSettingsAction(
+  settings: Partial<Pick<Settings, "kwhPrice" | "currency" | "usdRate">>
+) {
   const session = await getSession();
   if (!session.isLoggedIn || session.role !== "manager") {
     return { error: "Only manager can update settings" };

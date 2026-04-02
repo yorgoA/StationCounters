@@ -139,6 +139,7 @@ export interface AmperePriceTier {
 export interface Settings {
   kwhPrice: number;
   currency: string;
+  usdRate: number; // 1 USD in LBP
   updatedAt: string;
 }
 

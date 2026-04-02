@@ -9,6 +9,7 @@ import {
 import { ensureFixedMonthlyBillsForMonth } from "@/lib/fixed-monthly-auto-billing";
 import Link from "next/link";
 import DashboardMonthSelect from "./DashboardMonthSelect";
+import MoneyUsdRateForm from "./money/MoneyUsdRateForm";
 
 function getCurrentMonthKey() {
   const now = new Date();
@@ -34,6 +35,11 @@ function monthKeyFromDate(dateStr: string | undefined): string {
   const d = new Date(dateStr);
   if (Number.isNaN(d.getTime())) return "";
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function usdOf(lbp: number, usdRate: number): string {
+  if (!(usdRate > 0)) return "—";
+  return (lbp / usdRate).toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
 export default async function ManagerDashboardPage({
@@ -113,6 +119,7 @@ export default async function ManagerDashboardPage({
   const totalCustomers = customers.filter((c) => !c.isMonitor);
   const activeCustomers = totalCustomers.filter((c) => c.status === "ACTIVE");
   const monitorCount = customers.filter((c) => c.isMonitor).length;
+  const usdRate = settings.usdRate > 0 ? settings.usdRate : 89700;
 
   return (
     <div>
@@ -125,11 +132,14 @@ export default async function ManagerDashboardPage({
             High-level overview for {formatMonthKey(monthKey)}
           </p>
         </div>
-        <div>
+        <div className="flex flex-wrap items-end gap-4">
+          <MoneyUsdRateForm initialUsdRate={usdRate} />
+          <div>
           <label className="block text-sm font-medium text-slate-600 mb-1">
             View month
           </label>
           <DashboardMonthSelect months={months} currentMonth={monthKey} />
+          </div>
         </div>
       </div>
 
@@ -149,30 +159,35 @@ export default async function ManagerDashboardPage({
           <p className="text-2xl font-bold text-slate-800 break-words leading-tight">
             {totalToBePaid.toLocaleString()}
           </p>
+          <p className="text-xs text-slate-500 mt-1">${usdOf(totalToBePaid, usdRate)}</p>
         </div>
         <div className="bg-white rounded-lg border border-slate-200 p-5">
           <p className="text-sm text-slate-500">Collected</p>
           <p className="text-2xl font-bold text-green-600 break-words leading-tight">
             {collected.toLocaleString()}
           </p>
+          <p className="text-xs text-slate-500 mt-1">${usdOf(collected, usdRate)}</p>
         </div>
         <div className="bg-white rounded-lg border border-slate-200 p-5">
           <p className="text-sm text-slate-500">Unpaid total</p>
           <p className="text-2xl font-bold text-amber-600 break-words leading-tight">
             {unpaidTotal.toLocaleString()}
           </p>
+          <p className="text-xs text-slate-500 mt-1">${usdOf(unpaidTotal, usdRate)}</p>
         </div>
         <div className="bg-white rounded-lg border border-slate-200 p-5">
           <p className="text-sm text-slate-500">Previous unpaid</p>
           <p className="text-2xl font-bold text-slate-800 break-words leading-tight">
             {previousUnpaid.toLocaleString()}
           </p>
+          <p className="text-xs text-slate-500 mt-1">${usdOf(previousUnpaid, usdRate)}</p>
         </div>
         <div className="bg-white rounded-lg border border-slate-200 p-5">
           <p className="text-sm text-slate-500">Total owed</p>
           <p className="text-2xl font-bold text-rose-600 break-words leading-tight">
             {totalOwed.toLocaleString()}
           </p>
+          <p className="text-xs text-slate-500 mt-1">${usdOf(totalOwed, usdRate)}</p>
         </div>
       </div>
 

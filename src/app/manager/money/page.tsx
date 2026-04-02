@@ -2,9 +2,17 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { ensureFixedMonthlyBillsForMonth } from "@/lib/fixed-monthly-auto-billing";
-import { getAllBills, getAllCustomers } from "@/lib/google-sheets";
+import { getAmperePriceForTier } from "@/lib/billing";
+import {
+  getAllBills,
+  getAllCustomers,
+  getAmperePrices,
+  getKwhPriceForMonth,
+  getSettings,
+} from "@/lib/google-sheets";
 import type { BillingType } from "@/types";
 import MoneyMonthSelect from "./MoneyMonthSelect";
+import MoneyUsdRateForm from "./MoneyUsdRateForm";
 
 function getCurrentMonthKey() {
   const now = new Date();
@@ -32,6 +40,11 @@ function monthKeyFromDate(dateStr: string | undefined): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
+function usdOf(lbp: number, usdRate: number): string {
+  if (!(usdRate > 0)) return "—";
+  return (lbp / usdRate).toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
 export default async function ManagerMoneyPage({
   searchParams,
 }: {
@@ -41,7 +54,13 @@ export default async function ManagerMoneyPage({
   const monthKey = params.month || getPreviousMonthKey();
   await ensureFixedMonthlyBillsForMonth(monthKey);
 
-  const [customers, bills] = await Promise.all([getAllCustomers(), getAllBills()]);
+  const [customers, bills, ampereTiers, monthKwhPrice, settings] = await Promise.all([
+    getAllCustomers(),
+    getAllBills(),
+    getAmperePrices(),
+    getKwhPriceForMonth(monthKey),
+    getSettings(),
+  ]);
   const billMonths = Array.from(new Set(bills.map((b) => b.monthKey)));
   const months = Array.from(
     new Set([...billMonths, getCurrentMonthKey(), getPreviousMonthKey()])
@@ -68,15 +87,52 @@ export default async function ManagerMoneyPage({
       return createdMonth <= b.monthKey;
     }
   );
+  const effectiveKwhPrice = monthKwhPrice > 0 ? monthKwhPrice : settings.kwhPrice;
+  const freeNonMonitorIds = new Set(
+    customers
+      .filter((c) => c.billingType === "FREE" && !c.isMonitor)
+      .map((c) => c.customerId)
+  );
+  const monthFreeBills = bills.filter(
+    (b) => b.monthKey === monthKey && freeNonMonitorIds.has(b.customerId)
+  );
+  const freeLostFromAmpere = monthFreeBills.reduce((sum, b) => {
+    const customer = customerMap.get(b.customerId);
+    if (!customer) return sum;
+    return sum + getAmperePriceForTier(customer.subscribedAmpere, ampereTiers);
+  }, 0);
+  const freeLostFromConsumption = monthFreeBills.reduce(
+    (sum, b) => sum + Math.round(b.usageKwh * effectiveKwhPrice),
+    0
+  );
+  const freeLostTotal = freeLostFromAmpere + freeLostFromConsumption;
+  const billByCustomer = new Map(bills.filter((b) => b.monthKey === monthKey).map((b) => [b.customerId, b]));
+  const monitorRows = customers.filter((c) => c.isMonitor);
+  const monitorExcessKwh = monitorRows.reduce((sum, monitor) => {
+    const links = monitor.linkedCustomerIds?.length
+      ? monitor.linkedCustomerIds
+      : monitor.linkedCustomerId
+        ? [monitor.linkedCustomerId]
+        : [];
+    if (links.length === 0) return sum;
+    const monitorBill = billByCustomer.get(monitor.customerId);
+    const firstLinkedBill = billByCustomer.get(links[0]);
+    const monitorUsage = (monitorBill ?? firstLinkedBill)?.usageKwh ?? 0;
+    const included = links.reduce((acc, linkedId) => {
+      const linked = customerMap.get(linkedId);
+      if (!linked) return acc;
+      if (linked.billingType !== "FIXED_MONTHLY" || linked.isMonitor) return acc;
+      return acc + (effectiveKwhPrice > 0 ? linked.fixedMonthlyPrice / effectiveKwhPrice : 0);
+    }, 0);
+    return sum + Math.max(0, monitorUsage - included);
+  }, 0);
+  const monitorExcessLost = Math.round(monitorExcessKwh * effectiveKwhPrice);
+  const usdRate = settings.usdRate > 0 ? settings.usdRate : 89700;
 
   const totalToBePaid = monthPayingBills.reduce((s, b) => s + b.totalDue, 0);
   const totalCollected = monthPayingBills.reduce((s, b) => s + b.totalPaid, 0);
   const unpaidTotal = monthPayingBills.reduce((s, b) => s + b.remainingDue, 0);
   const previousUnpaid = previousPayingBills.reduce((s, b) => s + b.remainingDue, 0);
-  const totalOverpaid = monthPayingBills.reduce(
-    (s, b) => s + Math.max(0, b.totalPaid - b.totalDue),
-    0
-  );
   const unpaidRows = monthPayingBills
     .filter((b) => b.remainingDue > 0)
     .map((b) => ({
@@ -108,32 +164,51 @@ export default async function ManagerMoneyPage({
           <h1 className="text-2xl font-bold text-slate-800">Money Dashboard</h1>
           <p className="text-slate-500 mt-1">Financial view for {formatMonthKey(monthKey)}.</p>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-600 mb-1">Month</label>
-          <MoneyMonthSelect months={months} currentMonth={monthKey} />
+        <div className="flex flex-wrap items-end gap-4">
+          <MoneyUsdRateForm initialUsdRate={usdRate} />
+          <div>
+            <label className="block text-sm font-medium text-slate-600 mb-1">Month</label>
+            <MoneyMonthSelect months={months} currentMonth={monthKey} />
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
         <div className="bg-white rounded-lg border border-slate-200 p-5">
           <p className="text-sm text-slate-500">Total to be paid</p>
           <p className="text-2xl font-bold text-slate-800">{totalToBePaid.toLocaleString()}</p>
+          <p className="text-xs text-slate-500 mt-1">${usdOf(totalToBePaid, usdRate)}</p>
         </div>
         <div className="bg-white rounded-lg border border-slate-200 p-5">
           <p className="text-sm text-slate-500">Collected</p>
           <p className="text-2xl font-bold text-green-600">{totalCollected.toLocaleString()}</p>
+          <p className="text-xs text-slate-500 mt-1">${usdOf(totalCollected, usdRate)}</p>
         </div>
         <div className="bg-white rounded-lg border border-slate-200 p-5">
           <p className="text-sm text-slate-500">Unpaid total</p>
           <p className="text-2xl font-bold text-amber-600">{unpaidTotal.toLocaleString()}</p>
+          <p className="text-xs text-slate-500 mt-1">${usdOf(unpaidTotal, usdRate)}</p>
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <div className="bg-white rounded-lg border border-slate-200 p-5">
           <p className="text-sm text-slate-500">Previous unpaid</p>
           <p className="text-2xl font-bold text-slate-800">{previousUnpaid.toLocaleString()}</p>
+          <p className="text-xs text-slate-500 mt-1">${usdOf(previousUnpaid, usdRate)}</p>
         </div>
         <div className="bg-white rounded-lg border border-slate-200 p-5">
-          <p className="text-sm text-slate-500">Overpaid</p>
-          <p className="text-2xl font-bold text-indigo-600">{totalOverpaid.toLocaleString()}</p>
+          <p className="text-sm text-slate-500">Lost from free (excl. monitors)</p>
+          <p className="text-2xl font-bold text-rose-600">{freeLostTotal.toLocaleString()}</p>
+          <p className="text-xs text-slate-500 mt-1">${usdOf(freeLostTotal, usdRate)}</p>
+        </div>
+        <div className="bg-white rounded-lg border border-slate-200 p-5">
+          <p className="text-sm text-slate-500">Lost from monitor excess (red)</p>
+          <p className="text-2xl font-bold text-rose-600">{monitorExcessLost.toLocaleString()}</p>
+          <p className="text-xs text-slate-500 mt-1">
+            {monitorExcessKwh.toLocaleString(undefined, { maximumFractionDigits: 1 })} kWh red match
+          </p>
+          <p className="text-xs text-slate-500">${usdOf(monitorExcessLost, usdRate)}</p>
         </div>
       </div>
 
@@ -145,24 +220,28 @@ export default async function ManagerMoneyPage({
             <p className="text-xl font-bold text-slate-800">
               {byBillingType.BOTH.toLocaleString()} LBP
             </p>
+            <p className="text-xs text-slate-500 mt-1">${usdOf(byBillingType.BOTH, usdRate)}</p>
           </div>
           <div className="rounded border border-slate-200 p-4">
             <p className="text-sm text-slate-500">kWh only</p>
             <p className="text-xl font-bold text-slate-800">
               {byBillingType.KWH_ONLY.toLocaleString()} LBP
             </p>
+            <p className="text-xs text-slate-500 mt-1">${usdOf(byBillingType.KWH_ONLY, usdRate)}</p>
           </div>
           <div className="rounded border border-slate-200 p-4">
             <p className="text-sm text-slate-500">Ampere only</p>
             <p className="text-xl font-bold text-slate-800">
               {byBillingType.AMPERE_ONLY.toLocaleString()} LBP
             </p>
+            <p className="text-xs text-slate-500 mt-1">${usdOf(byBillingType.AMPERE_ONLY, usdRate)}</p>
           </div>
           <div className="rounded border border-slate-200 p-4">
             <p className="text-sm text-slate-500">Fixed monthly</p>
             <p className="text-xl font-bold text-slate-800">
               {byBillingType.FIXED_MONTHLY.toLocaleString()} LBP
             </p>
+            <p className="text-xs text-slate-500 mt-1">${usdOf(byBillingType.FIXED_MONTHLY, usdRate)}</p>
           </div>
         </div>
       </div>

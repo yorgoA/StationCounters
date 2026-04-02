@@ -191,16 +191,18 @@ export function rowToSettings(row: string[]): Settings {
   const kwhIdx = r.length >= 4 ? 1 : 0;
   const currIdx = r.length >= 4 ? 2 : 1;
   const updIdx = r.length >= 4 ? 3 : 2;
+  const usdIdx = r.length >= 5 ? 4 : -1;
   return {
     kwhPrice: parseFloat(r[kwhIdx] || "0") || 0,
     currency: r[currIdx] || "LBP",
+    usdRate: usdIdx >= 0 ? parseFloat(r[usdIdx] || "0") || 89700 : 89700,
     updatedAt: r[updIdx] || "",
   };
 }
 
 export function settingsToRow(s: Settings): string[] {
-  // Sheet columns: Ampere Price (A, deprecated), Kwh Price (B), Currency (C), Updated At (D)
-  return ["", String(s.kwhPrice), s.currency, s.updatedAt];
+  // Sheet columns: Ampere Price (A, deprecated), Kwh Price (B), Currency (C), Updated At (D), USD Rate (E)
+  return ["", String(s.kwhPrice), s.currency, s.updatedAt, String(s.usdRate ?? 89700)];
 }
 
 export function rowToAmperePriceTier(row: string[]): AmperePriceTier {
