@@ -16,6 +16,11 @@ const CHECK_TTL_MS = 60_000;
 const recentChecks = new Map<string, number>();
 const inflightChecks = new Map<string, Promise<EnsureResult>>();
 
+function getCurrentMonthKey(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
 function getPreviousUnpaidBalance(bills: Bill[], monthKey: string): number {
   const unpaid = bills
     .filter(
@@ -40,6 +45,9 @@ function isEligibleFixedMonthly(customer: Customer): boolean {
 
 export async function ensureFixedMonthlyBillsForMonth(monthKey: string): Promise<EnsureResult> {
   if (!/^\d{4}-\d{2}$/.test(monthKey)) return { created: 0 };
+  // Safety: auto-generate only for current month to avoid recreating
+  // historical/future bills when managers browse other months.
+  if (monthKey !== getCurrentMonthKey()) return { created: 0 };
 
   const now = Date.now();
   const checkedAt = recentChecks.get(monthKey) ?? 0;

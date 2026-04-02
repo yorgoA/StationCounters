@@ -202,10 +202,6 @@ export async function deleteBillAction(input: { billId: string }) {
   }
 
   try {
-    // Remove linked payments first to prevent orphan payment rows.
-    await deletePaymentsByBillId(input.billId);
-    await deleteBillById(input.billId);
-
     // If a fixed-monthly bill is manually deleted, persist a month override to FREE
     // so auto-billing does not recreate the same month on dashboard visits.
     const monthProfile = await getBillingProfileForMonth(bill.customerId, bill.monthKey);
@@ -228,6 +224,10 @@ export async function deleteBillAction(input: { billId: string }) {
       };
       await upsertBillingHistoryEntry(blockEntry);
     }
+
+    // Remove linked payments first to prevent orphan payment rows.
+    await deletePaymentsByBillId(input.billId);
+    await deleteBillById(input.billId);
 
     revalidatePath("/employee");
     revalidatePath("/manager");

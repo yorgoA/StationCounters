@@ -94,6 +94,20 @@ const RANGE_CACHE_TTL_MS = 1500;
 const rangeCache = new Map<string, RangeCacheEntry>();
 const inflightRangeReads = new Map<string, Promise<string[][]>>();
 
+function invalidateRangeCacheForSheet(sheetName: string) {
+  const prefixes = [sheetName, `${sheetName}!`];
+  for (const key of Array.from(rangeCache.keys())) {
+    if (prefixes.some((p) => key === p || key.startsWith(p))) {
+      rangeCache.delete(key);
+    }
+  }
+  for (const key of Array.from(inflightRangeReads.keys())) {
+    if (prefixes.some((p) => key === p || key.startsWith(p))) {
+      inflightRangeReads.delete(key);
+    }
+  }
+}
+
 async function getRange(
   sheetName: string,
   range?: string,
@@ -153,6 +167,7 @@ async function appendRow(sheetName: string, values: string[]) {
     insertDataOption: "INSERT_ROWS",
     requestBody: { values: [values] },
   });
+  invalidateRangeCacheForSheet(sheetName);
 }
 
 async function updateRow(sheetName: string, rowIndex: number, values: string[]) {
@@ -164,6 +179,7 @@ async function updateRow(sheetName: string, rowIndex: number, values: string[]) 
     valueInputOption: "RAW",
     requestBody: { values: [values] },
   });
+  invalidateRangeCacheForSheet(sheetName);
 }
 
 async function ensureSheetWithHeader(sheetName: string, headers: string[]) {
@@ -312,6 +328,7 @@ async function deleteRowsByIndices(sheetTitle: string, rowIndices0Based: number[
     spreadsheetId,
     requestBody: { requests },
   });
+  invalidateRangeCacheForSheet(sheetTitle);
 }
 
 export async function deletePaymentsByBillId(billId: string): Promise<void> {
