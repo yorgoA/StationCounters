@@ -30,16 +30,36 @@ function formatMonthKey(monthKey: string) {
   return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
 }
 
-function monthKeyFromDate(dateStr: string | undefined): string {
-  if (!dateStr) return "";
-  const d = new Date(dateStr);
-  if (Number.isNaN(d.getTime())) return "";
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+function monthOrder(monthKey: string): number | null {
+  const m = /^(\d{4})-(\d{1,2})$/.exec(String(monthKey || "").trim());
+  if (!m) return null;
+  const year = Number(m[1]);
+  const month = Number(m[2]);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) return null;
+  return year * 100 + month;
+}
+
+function isBeforeMonth(left: string, right: string): boolean {
+  const l = monthOrder(left);
+  const r = monthOrder(right);
+  if (l === null || r === null) return false;
+  return l < r;
 }
 
 function usdOf(lbp: number, usdRate: number): string {
   if (!(usdRate > 0)) return "—";
   return (lbp / usdRate).toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
+function isExcludedFromCollection(
+  bill: { billingTypeSnapshot?: string; customerId: string; totalDue: number },
+  customer: { billingType: string; isMonitor: boolean } | undefined
+): boolean {
+  if (customer?.isMonitor) return true;
+  if (bill.billingTypeSnapshot === "FREE") return true;
+  // Legacy bills may not have snapshots; classify by bill value, not current customer type.
+  if (!bill.billingTypeSnapshot && !(bill.totalDue > 0)) return true;
+  return false;
 }
 
 export default async function ManagerDashboardPage({
@@ -65,32 +85,25 @@ export default async function ManagerDashboardPage({
   const allMonths = new Set([...billMonths, currentKey, previousKey]);
   const months = Array.from(allMonths).sort().reverse();
 
-  const monitorIds = new Set(
-    customers.filter((c) => c.isMonitor).map((c) => c.customerId)
-  );
+  const customerMap = new Map(customers.map((c) => [c.customerId, c]));
+  const monitorIds = new Set(customers.filter((c) => c.isMonitor).map((c) => c.customerId));
   const freeIds = new Set(customers.filter((c) => c.billingType === "FREE").map((c) => c.customerId));
-  const excludedIds = new Set(
-    Array.from(freeIds).concat(Array.from(monitorIds))
-  );
 
-  const currentPayingBills = monthBills.filter((b) => !excludedIds.has(b.customerId));
+  const currentPayingBills = monthBills.filter((b) => !isExcludedFromCollection(b, customerMap.get(b.customerId)));
   const previousPayingBills = bills.filter(
     (b) => {
-      if (!(b.monthKey < monthKey)) return false;
-      if (excludedIds.has(b.customerId)) return false;
+      if (!isBeforeMonth(b.monthKey, monthKey)) return false;
+      if (isExcludedFromCollection(b, customerMap.get(b.customerId))) return false;
       if (!(b.remainingDue > 0)) return false;
-      const customer = customers.find((c) => c.customerId === b.customerId);
-      const createdMonth = monthKeyFromDate(customer?.createdAt);
-      if (!createdMonth) return true;
-      return createdMonth <= b.monthKey;
+      return true;
     }
   );
 
   const totalToBePaid = currentPayingBills.reduce((s, b) => s + b.totalDue, 0);
   const collected = currentPayingBills.reduce((s, b) => s + b.totalPaid, 0);
-  const unpaidTotal = currentPayingBills.reduce((s, b) => s + b.remainingDue, 0);
+  const unpaidCurrentMonth = currentPayingBills.reduce((s, b) => s + b.remainingDue, 0);
   const previousUnpaid = previousPayingBills.reduce((s, b) => s + b.remainingDue, 0);
-  const totalOwed = totalToBePaid + previousUnpaid;
+  const unpaidTillToday = unpaidCurrentMonth + previousUnpaid;
   const payingKwh = currentPayingBills.reduce((s, b) => s + b.usageKwh, 0);
   const freeKwh = monthBills
     .filter((b) => freeIds.has(b.customerId) && !monitorIds.has(b.customerId))
@@ -109,7 +122,7 @@ export default async function ManagerDashboardPage({
     const firstLinkedBill = billByCustomer.get(links[0]);
     const monitorUsage = (monitorBill ?? firstLinkedBill)?.usageKwh ?? 0;
     const included = links.reduce((acc, linkedId) => {
-      const linked = customers.find((x) => x.customerId === linkedId);
+      const linked = customerMap.get(linkedId);
       if (!linked) return acc;
       if (linked.billingType !== "FIXED_MONTHLY" || linked.isMonitor) return acc;
       return acc + (kwhPrice > 0 ? linked.fixedMonthlyPrice / kwhPrice : 0);
@@ -143,7 +156,7 @@ export default async function ManagerDashboardPage({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
         <div className="bg-white rounded-lg border border-slate-200 p-5">
           <p className="text-sm text-slate-500">Total customers</p>
           <p className="text-2xl font-bold text-slate-800 break-words leading-tight">
@@ -168,12 +181,15 @@ export default async function ManagerDashboardPage({
           </p>
           <p className="text-xs text-slate-500 mt-1">${usdOf(collected, usdRate)}</p>
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <div className="bg-white rounded-lg border border-slate-200 p-5">
-          <p className="text-sm text-slate-500">Unpaid total</p>
+          <p className="text-sm text-slate-500">Unpaid total (current month)</p>
           <p className="text-2xl font-bold text-amber-600 break-words leading-tight">
-            {unpaidTotal.toLocaleString()}
+            {unpaidCurrentMonth.toLocaleString()}
           </p>
-          <p className="text-xs text-slate-500 mt-1">${usdOf(unpaidTotal, usdRate)}</p>
+          <p className="text-xs text-slate-500 mt-1">${usdOf(unpaidCurrentMonth, usdRate)}</p>
         </div>
         <div className="bg-white rounded-lg border border-slate-200 p-5">
           <p className="text-sm text-slate-500">Previous unpaid</p>
@@ -183,11 +199,11 @@ export default async function ManagerDashboardPage({
           <p className="text-xs text-slate-500 mt-1">${usdOf(previousUnpaid, usdRate)}</p>
         </div>
         <div className="bg-white rounded-lg border border-slate-200 p-5">
-          <p className="text-sm text-slate-500">Total owed</p>
+          <p className="text-sm text-slate-500">Unpaid total (till today)</p>
           <p className="text-2xl font-bold text-rose-600 break-words leading-tight">
-            {totalOwed.toLocaleString()}
+            {unpaidTillToday.toLocaleString()}
           </p>
-          <p className="text-xs text-slate-500 mt-1">${usdOf(totalOwed, usdRate)}</p>
+          <p className="text-xs text-slate-500 mt-1">${usdOf(unpaidTillToday, usdRate)}</p>
         </div>
       </div>
 

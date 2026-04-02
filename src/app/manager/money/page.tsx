@@ -33,16 +33,36 @@ function formatMonthKey(monthKey: string) {
   return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
 }
 
-function monthKeyFromDate(dateStr: string | undefined): string {
-  if (!dateStr) return "";
-  const d = new Date(dateStr);
-  if (Number.isNaN(d.getTime())) return "";
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+function monthOrder(monthKey: string): number | null {
+  const m = /^(\d{4})-(\d{1,2})$/.exec(String(monthKey || "").trim());
+  if (!m) return null;
+  const year = Number(m[1]);
+  const month = Number(m[2]);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) return null;
+  return year * 100 + month;
+}
+
+function isBeforeMonth(left: string, right: string): boolean {
+  const l = monthOrder(left);
+  const r = monthOrder(right);
+  if (l === null || r === null) return false;
+  return l < r;
 }
 
 function usdOf(lbp: number, usdRate: number): string {
   if (!(usdRate > 0)) return "—";
   return (lbp / usdRate).toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
+function isExcludedFromCollection(
+  bill: { billingTypeSnapshot?: string; customerId: string; totalDue: number },
+  customer: { billingType: string; isMonitor: boolean } | undefined
+): boolean {
+  if (customer?.isMonitor) return true;
+  if (bill.billingTypeSnapshot === "FREE") return true;
+  // Legacy bills may not have snapshots; classify by bill value, not current customer type.
+  if (!bill.billingTypeSnapshot && !(bill.totalDue > 0)) return true;
+  return false;
 }
 
 export default async function ManagerMoneyPage({
@@ -67,24 +87,17 @@ export default async function ManagerMoneyPage({
   ).sort().reverse();
 
   const monitorIds = new Set(customers.filter((c) => c.isMonitor).map((c) => c.customerId));
-  const freeIds = new Set(customers.filter((c) => c.billingType === "FREE").map((c) => c.customerId));
-  const excludedIds = new Set(
-    Array.from(monitorIds).concat(Array.from(freeIds))
-  );
   const customerMap = new Map(customers.map((c) => [c.customerId, c]));
 
   const monthPayingBills = bills.filter(
-    (b) => b.monthKey === monthKey && !excludedIds.has(b.customerId)
+    (b) => b.monthKey === monthKey && !isExcludedFromCollection(b, customerMap.get(b.customerId))
   );
   const previousPayingBills = bills.filter(
     (b) => {
-      if (!(b.monthKey < monthKey)) return false;
-      if (excludedIds.has(b.customerId)) return false;
+      if (!isBeforeMonth(b.monthKey, monthKey)) return false;
+      if (isExcludedFromCollection(b, customerMap.get(b.customerId))) return false;
       if (!(b.remainingDue > 0)) return false;
-      const customer = customerMap.get(b.customerId);
-      const createdMonth = monthKeyFromDate(customer?.createdAt);
-      if (!createdMonth) return true;
-      return createdMonth <= b.monthKey;
+      return true;
     }
   );
   const effectiveKwhPrice = monthKwhPrice > 0 ? monthKwhPrice : settings.kwhPrice;
