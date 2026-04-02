@@ -34,6 +34,16 @@ function monthKeyFromDate(dateStr: string) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
+function isExcludedFromCollection(
+  bill: { billingTypeSnapshot?: string; totalDue: number },
+  customer: { billingType: string; isMonitor?: boolean } | undefined
+): boolean {
+  if (customer?.isMonitor) return true;
+  if (bill.billingTypeSnapshot === "FREE") return true;
+  if (!bill.billingTypeSnapshot && !(bill.totalDue > 0)) return true;
+  return false;
+}
+
 export default async function ManagerKwhPage({
   searchParams,
 }: {
@@ -56,22 +66,15 @@ export default async function ManagerKwhPage({
     new Set([...billMonths, getCurrentMonthKey(), getPreviousMonthKey()])
   ).sort().reverse();
 
-  const activeCustomers = customers.filter((c) => c.status === "ACTIVE");
-  const freeIds = new Set(
-    activeCustomers.filter((c) => c.billingType === "FREE" && !c.isMonitor).map((c) => c.customerId)
-  );
-  const monitorIds = new Set(activeCustomers.filter((c) => c.isMonitor).map((c) => c.customerId));
-  const payingIds = new Set(
-    activeCustomers
-      .filter((c) => c.billingType !== "FREE" && !c.isMonitor)
-      .map((c) => c.customerId)
-  );
-
   const monthBills = bills.filter((b) => b.monthKey === monthKey);
-  const payingBills = monthBills.filter((b) => payingIds.has(b.customerId));
-  const freeBills = monthBills.filter((b) => freeIds.has(b.customerId));
-  const monitorBills = monthBills.filter((b) => monitorIds.has(b.customerId));
   const customerMap = new Map(customers.map((c) => [c.customerId, c]));
+  const activeCustomers = customers.filter((c) => c.status === "ACTIVE");
+  const monitorIds = new Set(activeCustomers.filter((c) => c.isMonitor).map((c) => c.customerId));
+  const payingBills = monthBills.filter((b) => !isExcludedFromCollection(b, customerMap.get(b.customerId)));
+  const freeBills = monthBills.filter((b) => {
+    const customer = customerMap.get(b.customerId);
+    return !customer?.isMonitor && isExcludedFromCollection(b, customer);
+  });
 
   const payingKwh = payingBills.reduce((s, b) => s + b.usageKwh, 0);
   const fromAmpere = payingBills.reduce((s, b) => s + b.ampereCharge, 0);
