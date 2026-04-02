@@ -29,6 +29,13 @@ function formatMonthKey(monthKey: string) {
   return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
 }
 
+function monthKeyFromDate(dateStr: string | undefined): string {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return "";
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
 export default async function ManagerDashboardPage({
   searchParams,
 }: {
@@ -62,7 +69,15 @@ export default async function ManagerDashboardPage({
 
   const currentPayingBills = monthBills.filter((b) => !excludedIds.has(b.customerId));
   const previousPayingBills = bills.filter(
-    (b) => b.monthKey < monthKey && !excludedIds.has(b.customerId) && b.remainingDue > 0
+    (b) => {
+      if (!(b.monthKey < monthKey)) return false;
+      if (excludedIds.has(b.customerId)) return false;
+      if (!(b.remainingDue > 0)) return false;
+      const customer = customers.find((c) => c.customerId === b.customerId);
+      const createdMonth = monthKeyFromDate(customer?.createdAt);
+      if (!createdMonth) return true;
+      return createdMonth <= b.monthKey;
+    }
   );
 
   const totalToBePaid = currentPayingBills.reduce((s, b) => s + b.totalDue, 0);

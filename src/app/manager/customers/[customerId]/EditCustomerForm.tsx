@@ -50,7 +50,8 @@ export default function EditCustomerForm({
     effectiveBillingType === "BOTH" ||
     effectiveBillingType === "FIXED_MONTHLY";
 
-  const showSubscribedAmpere = !monitorChecked && billingType !== "FIXED_MONTHLY";
+  const showSubscribedAmpere =
+    !monitorChecked && billingType !== "FIXED_MONTHLY" && billingType !== "KWH_ONLY";
   const showFixedDiscountFields = !monitorChecked && billingType !== "FIXED_MONTHLY";
 
   const linkableCustomers = allCustomers.filter(
@@ -290,6 +291,11 @@ export default function EditCustomerForm({
         </p>
       )}
         </>
+      )}
+      {!freeChecked && billingType === "KWH_ONLY" && (
+        <p className="text-xs text-slate-500">
+          Counter values (previous/current) are entered when recording or editing monthly readings.
+        </p>
       )}
       {error && <p className="text-red-600 text-sm">{error}</p>}
       <button type="submit" disabled={loading} className="btn-primary">

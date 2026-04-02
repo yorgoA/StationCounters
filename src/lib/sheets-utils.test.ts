@@ -28,7 +28,7 @@ describe("sheets-utils snapshots", () => {
       "2026-03-01",
     ];
     const b = rowToBill(legacy);
-    expect(b.billingTypeSnapshot).toBe("BOTH");
+    expect(b.billingTypeSnapshot).toBeUndefined();
     expect(b.subscribedAmpereSnapshot).toBe(0);
     expect(b.fixedMonthlyPriceSnapshot).toBe(0);
   });

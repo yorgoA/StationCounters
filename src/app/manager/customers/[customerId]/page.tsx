@@ -7,15 +7,12 @@ import {
   getCustomerById,
   getBillsByCustomer,
   getAllPayments,
-  getAmperePrices,
-  getAllCustomers,
   getBillingHistoryByCustomer,
   getBillingChangeLogsByCustomer,
   getPaymentsByBillIds,
 } from "@/lib/google-sheets";
-import EditCustomerForm from "./EditCustomerForm";
 import BillingHistoryWithEdit from "./BillingHistoryWithEdit";
-import MonthlyBillingProfileForm from "./MonthlyBillingProfileForm";
+import MonthlyBillingProfilePanel from "./MonthlyBillingProfilePanel";
 
 export default async function ManagerCustomerDetailPage({
   params,
@@ -24,12 +21,10 @@ export default async function ManagerCustomerDetailPage({
 }) {
   unstable_noStore();
   const { customerId } = await params;
-  const [customer, bills, allPayments, ampereTiers, allCustomers, billingHistory, billingLogs] = await Promise.all([
+  const [customer, bills, allPayments, billingHistory, billingLogs] = await Promise.all([
     getCustomerById(customerId),
     getBillsByCustomer(customerId),
     getAllPayments(),
-    getAmperePrices(),
-    getAllCustomers(),
     getBillingHistoryByCustomer(customerId),
     getBillingChangeLogsByCustomer(customerId),
   ]);
@@ -83,22 +78,13 @@ export default async function ManagerCustomerDetailPage({
               )}
               <p className="text-slate-700">Fixed monthly: <span className="font-medium">{(customer.fixedMonthlyPrice ?? 0).toLocaleString()}</span></p>
             </div>
-            <details className="rounded border border-slate-200 p-4">
-              <summary className="cursor-pointer font-medium text-primary-700">
-                Edit customer and month profiles
-              </summary>
-              <div className="mt-4">
-                <EditCustomerForm customer={customer} ampereTiers={ampereTiers} allCustomers={allCustomers} />
-                <div className="mt-6 border-t border-slate-200 pt-6">
-                  <h3 className="font-semibold text-slate-800 mb-1">Monthly billing profile</h3>
-                  <p className="text-xs text-slate-500 mb-4">
-                    Override customer billing rules for a specific month without affecting
-                    other months.
-                  </p>
-                  <MonthlyBillingProfileForm customer={customer} billingHistory={billingHistory} />
-                </div>
-              </div>
-            </details>
+            <div className="rounded border border-slate-200 p-4">
+              <MonthlyBillingProfilePanel
+                customer={customer}
+                billingHistory={billingHistory}
+                bills={sortedBills}
+              />
+            </div>
           </div>
         </div>
 

@@ -310,6 +310,8 @@ export async function upsertCustomerBillingProfileForMonthAction(input: {
   fixedDiscountAmount: number;
   fixedDiscountPercent: number;
   isMonitor: boolean;
+  previousCounter?: number;
+  currentCounter?: number;
   reason?: string;
 }) {
   const session = await getSession();
@@ -318,6 +320,12 @@ export async function upsertCustomerBillingProfileForMonthAction(input: {
   }
   if (!/^\d{4}-\d{2}$/.test(input.monthKey)) {
     return { error: "Invalid month format. Use YYYY-MM." };
+  }
+  if (
+    (input.billingType === "KWH_ONLY" || input.billingType === "BOTH") &&
+    (typeof input.previousCounter !== "number" || typeof input.currentCounter !== "number")
+  ) {
+    return { error: "Previous and current counters are required for kWh-only/BOTH profile." };
   }
   const current = await getBillingProfileForMonth(input.customerId, input.monthKey);
   if (!current) return { error: "Customer not found" };
@@ -366,8 +374,12 @@ export async function upsertCustomerBillingProfileForMonthAction(input: {
     const calc = calcBillFromReadings(
       existingBill.customerId,
       existingBill.monthKey,
-      existingBill.previousCounter,
-      existingBill.currentCounter,
+      typeof input.previousCounter === "number"
+        ? input.previousCounter
+        : existingBill.previousCounter,
+      typeof input.currentCounter === "number"
+        ? input.currentCounter
+        : existingBill.currentCounter,
       input.subscribedAmpere,
       effectiveBillingType,
       input.fixedMonthlyPrice,
@@ -381,6 +393,14 @@ export async function upsertCustomerBillingProfileForMonthAction(input: {
     const newPaymentStatus = calcPaymentStatus(existingBill.totalPaid, newRemainingDue);
     const updatedBill: Bill = {
       ...existingBill,
+      previousCounter:
+        typeof input.previousCounter === "number"
+          ? input.previousCounter
+          : existingBill.previousCounter,
+      currentCounter:
+        typeof input.currentCounter === "number"
+          ? input.currentCounter
+          : existingBill.currentCounter,
       usageKwh: calc.usageKwh,
       amperePriceSnapshot: calc.amperePriceSnapshot,
       kwhPriceSnapshot: calc.kwhPriceSnapshot,
@@ -397,7 +417,45 @@ export async function upsertCustomerBillingProfileForMonthAction(input: {
       updatedAt: new Date().toISOString(),
     };
     await dbUpdateBill(updatedBill);
+  } else if (
+    (input.billingType === "KWH_ONLY" || input.billingType === "BOTH") &&
+    typeof input.previousCounter === "number" &&
+    typeof input.currentCounter === "number"
+  ) {
+    const [kwhPrice, ampereTiers, bills] = await Promise.all([
+      getKwhPriceForMonth(input.monthKey),
+      getAmperePrices(),
+      getBillsByCustomer(input.customerId),
+    ]);
+    const previousUnpaid = getPreviousUnpaidBalance(bills, input.monthKey);
+    const calc = calcBillFromReadings(
+      input.customerId,
+      input.monthKey,
+      input.previousCounter,
+      input.currentCounter,
+      input.subscribedAmpere,
+      input.billingType,
+      input.fixedMonthlyPrice,
+      input.fixedDiscountAmount,
+      input.fixedDiscountPercent,
+      ampereTiers,
+      kwhPrice,
+      previousUnpaid
+    );
+    const newBill: Bill = {
+      ...calc,
+      billId: generateId("bill"),
+      billingTypeSnapshot: input.billingType,
+      subscribedAmpereSnapshot: input.subscribedAmpere,
+      fixedMonthlyPriceSnapshot: input.fixedMonthlyPrice,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    await dbCreateBill(newBill);
   }
+
+  // Rebuild downstream carry-in chain after any monthly profile change.
+  await recalculateCustomerBillsFromMonth(input.customerId, input.monthKey);
 
   revalidatePath("/manager");
   revalidatePath("/manager/bills");
@@ -429,4 +487,62 @@ export async function getCustomerLedgerAction(input: { customerId: string }) {
     history,
     logs,
   };
+}
+
+async function recalculateCustomerBillsFromMonth(
+  customerId: string,
+  fromMonthKey: string
+): Promise<void> {
+  const bills = (await getBillsByCustomer(customerId))
+    .filter((b) => b.monthKey >= fromMonthKey)
+    .sort((a, b) => a.monthKey.localeCompare(b.monthKey));
+
+  for (const bill of bills) {
+    const [profile, kwhPrice, ampereTiers, allBills] = await Promise.all([
+      getBillingProfileForMonth(bill.customerId, bill.monthKey),
+      getKwhPriceForMonth(bill.monthKey),
+      getAmperePrices(),
+      getBillsByCustomer(bill.customerId),
+    ]);
+    if (!profile) continue;
+    const previousUnpaid = getPreviousUnpaidBalance(
+      allBills.filter((b) => b.billId !== bill.billId),
+      bill.monthKey
+    );
+    const effectiveBillingType = profile.isMonitor ? "FREE" : profile.billingType;
+    const calc = calcBillFromReadings(
+      bill.customerId,
+      bill.monthKey,
+      bill.previousCounter,
+      bill.currentCounter,
+      profile.subscribedAmpere,
+      effectiveBillingType,
+      profile.fixedMonthlyPrice ?? 0,
+      profile.fixedDiscountAmount ?? 0,
+      profile.fixedDiscountPercent ?? 0,
+      ampereTiers,
+      kwhPrice,
+      previousUnpaid
+    );
+    const newRemainingDue = Math.max(0, calc.totalDue - bill.totalPaid);
+    const newPaymentStatus = calcPaymentStatus(bill.totalPaid, newRemainingDue);
+    const updated: Bill = {
+      ...bill,
+      usageKwh: calc.usageKwh,
+      amperePriceSnapshot: calc.amperePriceSnapshot,
+      kwhPriceSnapshot: calc.kwhPriceSnapshot,
+      ampereCharge: calc.ampereCharge,
+      consumptionCharge: calc.consumptionCharge,
+      discountApplied: calc.discountApplied,
+      previousUnpaidBalance: calc.previousUnpaidBalance,
+      totalDue: calc.totalDue,
+      remainingDue: newRemainingDue,
+      paymentStatus: newPaymentStatus,
+      billingTypeSnapshot: effectiveBillingType,
+      subscribedAmpereSnapshot: profile.subscribedAmpere,
+      fixedMonthlyPriceSnapshot: profile.fixedMonthlyPrice,
+      updatedAt: new Date().toISOString(),
+    };
+    await dbUpdateBill(updated);
+  }
 }
