@@ -72,14 +72,65 @@ async function getSheets() {
   return { sheets, spreadsheetId };
 }
 
-async function getRange(sheetName: string, range?: string): Promise<string[][]> {
-  const { sheets, spreadsheetId } = await getSheets();
+type RangeCacheEntry = {
+  expiresAt: number;
+  values: string[][];
+};
+
+// Keep this cache very short to reduce quota spikes in dev/re-render bursts
+// without re-introducing stale business logic behavior.
+const RANGE_CACHE_TTL_MS = 1500;
+const rangeCache = new Map<string, RangeCacheEntry>();
+const inflightRangeReads = new Map<string, Promise<string[][]>>();
+
+async function getRange(
+  sheetName: string,
+  range?: string,
+  options?: { bypassCache?: boolean }
+): Promise<string[][]> {
   const fullRange = range ? `${sheetName}!${range}` : sheetName;
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: fullRange,
-  });
-  return (res.data.values || []) as string[][];
+  const cacheKey = fullRange;
+  const now = Date.now();
+  const bypassCache = options?.bypassCache === true;
+
+  if (!bypassCache) {
+    const cached = rangeCache.get(cacheKey);
+    if (cached && cached.expiresAt > now) {
+      return cached.values;
+    }
+
+    const inflight = inflightRangeReads.get(cacheKey);
+    if (inflight) {
+      return inflight;
+    }
+  }
+
+  const run = (async () => {
+    const { sheets, spreadsheetId } = await getSheets();
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: fullRange,
+    });
+    const values = (res.data.values || []) as string[][];
+    if (!bypassCache) {
+      rangeCache.set(cacheKey, {
+        values,
+        expiresAt: Date.now() + RANGE_CACHE_TTL_MS,
+      });
+    }
+    return values;
+  })();
+
+  if (!bypassCache) {
+    inflightRangeReads.set(cacheKey, run);
+    try {
+      return await run;
+    } finally {
+      inflightRangeReads.delete(cacheKey);
+    }
+  }
+
+  return run;
 }
 
 async function appendRow(sheetName: string, values: string[]) {

@@ -6,7 +6,13 @@ import { useRouter } from "next/navigation";
 import { updateFreeCustomerAction } from "@/app/actions/customer";
 import type { Customer } from "@/types";
 
-export default function FreeCustomersList({ customers }: { customers: Customer[] }) {
+export default function FreeCustomersList({
+  customers,
+  kwhByCustomerId,
+}: {
+  customers: Customer[];
+  kwhByCustomerId: Record<string, number>;
+}) {
   const router = useRouter();
   const [updating, setUpdating] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -90,6 +96,9 @@ export default function FreeCustomersList({ customers }: { customers: Customer[]
             <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">
               Box • Building
             </th>
+            <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">
+              kWh
+            </th>
             <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">
               Reason
             </th>
@@ -123,6 +132,11 @@ export default function FreeCustomersList({ customers }: { customers: Customer[]
               </td>
               <td className="px-4 py-3 text-slate-600 text-sm">
                 {c.area} • {c.building}
+              </td>
+              <td className="px-4 py-3 text-right text-slate-700 text-sm font-medium">
+                {(kwhByCustomerId[c.customerId] || 0).toLocaleString(undefined, {
+                  maximumFractionDigits: 1,
+                })}
               </td>
               <td className="px-4 py-3">
                 <div className="flex items-center gap-2">

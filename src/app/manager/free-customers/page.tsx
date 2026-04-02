@@ -41,6 +41,15 @@ export default async function ManagerFreeCustomersPage({
   const totalFreeKwh = bills
     .filter((b) => b.monthKey === monthKey && freeCustomerIds.has(b.customerId))
     .reduce((s, b) => s + b.usageKwh, 0);
+  const kwhByCustomerId = bills
+    .filter((b) => b.monthKey === monthKey && freeCustomerIds.has(b.customerId))
+    .reduce(
+      (acc, b) => {
+        acc[b.customerId] = (acc[b.customerId] || 0) + b.usageKwh;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
 
   return (
     <div>
@@ -67,7 +76,7 @@ export default async function ManagerFreeCustomersPage({
         </p>
       </div>
 
-      <FreeCustomersList customers={freeCustomers} />
+      <FreeCustomersList customers={freeCustomers} kwhByCustomerId={kwhByCustomerId} />
     </div>
   );
 }
