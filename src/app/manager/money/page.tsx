@@ -56,7 +56,7 @@ function usdOf(lbp: number, usdRate: number): string {
 
 function isExcludedFromCollection(
   bill: { billingTypeSnapshot?: string; customerId: string; totalDue: number },
-  customer: { billingType: string; isMonitor: boolean } | undefined
+  customer: { billingType: string; isMonitor?: boolean } | undefined
 ): boolean {
   if (customer?.isMonitor) return true;
   if (bill.billingTypeSnapshot === "FREE") return true;
