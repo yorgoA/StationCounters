@@ -14,15 +14,17 @@ export default function RecordReadingForm({
   customerId,
   customer,
   previousCounter = null,
+  initialMonthKey,
 }: {
   customerId: string;
   customer: Customer;
   previousCounter?: number | null;
+  initialMonthKey?: string;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [monthKey, setMonthKey] = useState(getCurrentMonthKey());
+  const [monthKey, setMonthKey] = useState(initialMonthKey || getCurrentMonthKey());
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();

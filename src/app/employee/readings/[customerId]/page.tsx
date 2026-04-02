@@ -7,10 +7,14 @@ import RecordReadingForm from "../../customers/[customerId]/RecordReadingForm";
 
 export default async function EmployeeRecordReadingPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ customerId: string }>;
+  searchParams: Promise<{ month?: string }>;
 }) {
   const { customerId } = await params;
+  const sp = await searchParams;
+  const selectedMonth = sp.month;
   const [customer, bills] = await Promise.all([
     getCustomerById(customerId),
     getBillsByCustomer(customerId),
@@ -24,7 +28,10 @@ export default async function EmployeeRecordReadingPage({
   return (
     <div>
       <div className="mb-6">
-        <Link href="/employee/readings" className="text-primary-600 hover:text-primary-700 text-sm">
+        <Link
+          href={selectedMonth ? `/employee/readings?month=${selectedMonth}` : "/employee/readings"}
+          className="text-primary-600 hover:text-primary-700 text-sm"
+        >
           ← Back to Record Reading
         </Link>
       </div>
@@ -39,6 +46,7 @@ export default async function EmployeeRecordReadingPage({
             customerId={customerId}
             customer={customer}
             previousCounter={previousCounter}
+            initialMonthKey={selectedMonth}
           />
         </div>
       </div>
