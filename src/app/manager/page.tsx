@@ -131,6 +131,7 @@ export default async function ManagerDashboardPage({
     }, 0);
     return sum + Math.max(0, monitorUsage - included);
   }, 0);
+  const totalKwhProduced = payingKwh + freeKwh + monitorExcessKwh;
   const totalCustomers = customers.filter((c) => !c.isMonitor);
   const activeCustomers = totalCustomers.filter((c) => c.status === "ACTIVE");
   const monitorCount = customers.filter((c) => c.isMonitor).length;
@@ -211,7 +212,13 @@ export default async function ManagerDashboardPage({
 
       <div className="bg-white rounded-lg border border-slate-200 p-6 mb-8">
         <h2 className="font-semibold text-slate-800 mb-4">Quick insights</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+          <div className="rounded border border-slate-200 p-4">
+            <p className="text-sm text-slate-500">Total kWh produced</p>
+            <p className="text-xl font-bold text-slate-800">
+              {totalKwhProduced.toLocaleString(undefined, { maximumFractionDigits: 1 })} kWh
+            </p>
+          </div>
           <div className="rounded border border-slate-200 p-4">
             <p className="text-sm text-slate-500">Paying kWh</p>
             <p className="text-xl font-bold text-slate-800">{payingKwh.toLocaleString()} kWh</p>
