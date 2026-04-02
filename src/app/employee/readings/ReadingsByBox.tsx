@@ -14,6 +14,7 @@ export default function ReadingsByBox({
   readingsLinkPath?: string;
 }) {
   const [boxFilter, setBoxFilter] = useState("");
+  const [showAll, setShowAll] = useState(false);
 
   const uniqueBoxes = useMemo(() => {
     const set = new Set(customers.map((c) => c.area || "").filter((a) => a !== ""));
@@ -26,11 +27,12 @@ export default function ReadingsByBox({
   }, [customers]);
 
   const filteredByBox = useMemo(() => {
+    if (showAll) return customers;
     if (!boxFilter) return [];
     if (boxFilter === "(No box)")
       return customers.filter((c) => !c.area?.trim());
     return customers.filter((c) => c.area === boxFilter);
-  }, [customers, boxFilter]);
+  }, [customers, boxFilter, showAll]);
 
   return (
     <>
@@ -38,18 +40,34 @@ export default function ReadingsByBox({
         <label className="block text-sm font-medium text-slate-700 mb-2">
           Box Number
         </label>
-        <select
-          value={boxFilter}
-          onChange={(e) => setBoxFilter(e.target.value)}
-          className="rounded-lg border border-slate-300 px-4 py-2 text-slate-800 text-base focus:outline-none focus:ring-2 focus:ring-primary-500 min-w-[200px]"
-        >
-          <option value="">Select a box...</option>
-          {uniqueBoxes.map((box) => (
-            <option key={box} value={box}>
-              {box === "(No box)" ? box : `Box ${box}`}
-            </option>
-          ))}
-        </select>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowAll((v) => !v)}
+            className={`px-3 py-2 rounded-lg text-sm font-medium border ${
+              showAll
+                ? "bg-primary-600 text-white border-primary-600"
+                : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+            }`}
+          >
+            {showAll ? "Showing all customers" : "Show all customers"}
+          </button>
+          <select
+            value={boxFilter}
+            onChange={(e) => {
+              setBoxFilter(e.target.value);
+              setShowAll(false);
+            }}
+            className="rounded-lg border border-slate-300 px-4 py-2 text-slate-800 text-base focus:outline-none focus:ring-2 focus:ring-primary-500 min-w-[200px]"
+          >
+            <option value="">Select a box...</option>
+            {uniqueBoxes.map((box) => (
+              <option key={box} value={box}>
+                {box === "(No box)" ? box : `Box ${box}`}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
       <div className="bg-white rounded-lg border border-slate-200 overflow-x-auto">
         <table className="min-w-[480px] w-full divide-y divide-slate-200">
@@ -89,7 +107,7 @@ export default function ReadingsByBox({
         </table>
         {filteredByBox.length === 0 && (
           <p className="text-center text-slate-500 py-12">
-            {!boxFilter
+            {!showAll && !boxFilter
               ? "Select a box number above to see customers"
               : "No customers in this box"}
           </p>
