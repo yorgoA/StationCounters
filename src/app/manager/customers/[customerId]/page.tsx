@@ -3,9 +3,19 @@ export const dynamic = "force-dynamic";
 import { unstable_noStore } from "next/cache";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { getCustomerById, getBillsByCustomer, getAllPayments, getAmperePrices, getAllCustomers } from "@/lib/google-sheets";
+import {
+  getCustomerById,
+  getBillsByCustomer,
+  getAllPayments,
+  getAmperePrices,
+  getAllCustomers,
+  getBillingHistoryByCustomer,
+  getBillingChangeLogsByCustomer,
+  getPaymentsByBillIds,
+} from "@/lib/google-sheets";
 import EditCustomerForm from "./EditCustomerForm";
 import BillingHistoryWithEdit from "./BillingHistoryWithEdit";
+import MonthlyBillingProfileForm from "./MonthlyBillingProfileForm";
 
 export default async function ManagerCustomerDetailPage({
   params,
@@ -14,17 +24,25 @@ export default async function ManagerCustomerDetailPage({
 }) {
   unstable_noStore();
   const { customerId } = await params;
-  const [customer, bills, allPayments, ampereTiers, allCustomers] = await Promise.all([
+  const [customer, bills, allPayments, ampereTiers, allCustomers, billingHistory, billingLogs] = await Promise.all([
     getCustomerById(customerId),
     getBillsByCustomer(customerId),
     getAllPayments(),
     getAmperePrices(),
     getAllCustomers(),
+    getBillingHistoryByCustomer(customerId),
+    getBillingChangeLogsByCustomer(customerId),
   ]);
 
   if (!customer) notFound();
 
+  const sortedBills = [...bills].sort((a, b) => b.monthKey.localeCompare(a.monthKey));
   const payments = allPayments.filter((p) => p.customerId === customerId);
+  const billPayments = await getPaymentsByBillIds(sortedBills.map((b) => b.billId));
+  const totalBilled = sortedBills.reduce((s, b) => s + b.totalDue, 0);
+  const totalReceived = sortedBills.reduce((s, b) => s + b.totalPaid, 0);
+  const outstanding = sortedBills.reduce((s, b) => s + b.remainingDue, 0);
+  const overpaidCredit = sortedBills.reduce((s, b) => s + Math.max(0, b.totalPaid - b.totalDue), 0);
 
   return (
     <div>
@@ -51,9 +69,36 @@ export default async function ManagerCustomerDetailPage({
           </div>
 
           <div className="bg-white rounded-lg border border-slate-200 p-6">
-            <h2 className="font-semibold text-slate-800 mb-1">Edit Customer (Manager)</h2>
-            <p className="text-xs text-slate-500 mb-4">Set active status, billing type (Free, Ampere, kWh), subscribed Ampere, discount.</p>
-            <EditCustomerForm customer={customer} ampereTiers={ampereTiers} allCustomers={allCustomers} />
+            <h2 className="font-semibold text-slate-800 mb-1">Customer details</h2>
+            <p className="text-xs text-slate-500 mb-4">
+              Read-only summary. Open edit mode only when you want to change customer settings.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm mb-4">
+              <p className="text-slate-700">Billing type: <span className="font-medium">{customer.billingType}</span></p>
+              <p className="text-slate-700">Status: <span className="font-medium">{customer.status}</span></p>
+              {customer.billingType === "FIXED_MONTHLY" ? (
+                <p className="text-slate-700">Plan: <span className="font-medium">Fixed monthly (ma2touua)</span></p>
+              ) : (
+                <p className="text-slate-700">Ampere: <span className="font-medium">{customer.subscribedAmpere}A</span></p>
+              )}
+              <p className="text-slate-700">Fixed monthly: <span className="font-medium">{(customer.fixedMonthlyPrice ?? 0).toLocaleString()}</span></p>
+            </div>
+            <details className="rounded border border-slate-200 p-4">
+              <summary className="cursor-pointer font-medium text-primary-700">
+                Edit customer and month profiles
+              </summary>
+              <div className="mt-4">
+                <EditCustomerForm customer={customer} ampereTiers={ampereTiers} allCustomers={allCustomers} />
+                <div className="mt-6 border-t border-slate-200 pt-6">
+                  <h3 className="font-semibold text-slate-800 mb-1">Monthly billing profile</h3>
+                  <p className="text-xs text-slate-500 mb-4">
+                    Override customer billing rules for a specific month without affecting
+                    other months.
+                  </p>
+                  <MonthlyBillingProfileForm customer={customer} billingHistory={billingHistory} />
+                </div>
+              </div>
+            </details>
           </div>
         </div>
 
@@ -63,7 +108,47 @@ export default async function ManagerCustomerDetailPage({
             <p className="text-xs text-slate-500 mb-2">
               Use &quot;Edit reading&quot; to correct counter values when an employee made an error.
             </p>
-            <BillingHistoryWithEdit bills={bills} />
+            <BillingHistoryWithEdit bills={sortedBills} payments={billPayments} />
+          </div>
+
+          <div className="bg-white rounded-lg border border-slate-200 p-6 mb-6">
+            <h2 className="font-semibold text-slate-800 mb-4">Reconciliation summary</h2>
+            <div className="space-y-1 text-sm">
+              <p className="text-slate-700">Lifetime billed: <span className="font-semibold">{totalBilled.toLocaleString()}</span></p>
+              <p className="text-slate-700">Lifetime received: <span className="font-semibold">{totalReceived.toLocaleString()}</span></p>
+              <p className="text-slate-700">Outstanding: <span className="font-semibold text-amber-700">{outstanding.toLocaleString()}</span></p>
+              <p className="text-slate-700">Overpaid credit: <span className="font-semibold text-indigo-700">{overpaidCredit.toLocaleString()}</span></p>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg border border-slate-200 p-6 mb-6">
+            <h2 className="font-semibold text-slate-800 mb-4">Month profile history</h2>
+            <div className="space-y-2 max-h-56 overflow-y-auto text-sm">
+              {billingHistory.map((h) => (
+                <div key={h.entryId} className="border-b border-slate-100 pb-2">
+                  <p className="font-medium text-slate-800">{h.monthKey} • {h.billingType}</p>
+                  <p className="text-slate-600">
+                    {h.subscribedAmpere}A • Fixed {h.fixedMonthlyPrice.toLocaleString()} • Disc {h.fixedDiscountAmount.toLocaleString()} / {h.fixedDiscountPercent}%
+                  </p>
+                  <p className="text-xs text-slate-500">{h.reason || "No reason"} • {h.updatedAt}</p>
+                </div>
+              ))}
+              {billingHistory.length === 0 && <p className="text-slate-500">No month overrides yet.</p>}
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg border border-slate-200 p-6">
+            <h2 className="font-semibold text-slate-800 mb-4">Audit log</h2>
+            <div className="space-y-2 max-h-56 overflow-y-auto text-sm">
+              {billingLogs.slice(0, 30).map((l) => (
+                <div key={l.logId} className="border-b border-slate-100 pb-2">
+                  <p className="font-medium text-slate-800">{l.monthKey} • {l.updatedByRole}</p>
+                  <p className="text-slate-600">{l.reason || "No reason"}</p>
+                  <p className="text-xs text-slate-500">{l.updatedAt}</p>
+                </div>
+              ))}
+              {billingLogs.length === 0 && <p className="text-slate-500">No audit logs yet.</p>}
+            </div>
           </div>
 
           <div className="bg-white rounded-lg border border-slate-200 p-6">

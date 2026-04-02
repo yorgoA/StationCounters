@@ -85,6 +85,9 @@ export interface Bill {
   totalPaid: number;
   remainingDue: number;
   paymentStatus: PaymentStatus;
+  billingTypeSnapshot?: BillingType;
+  subscribedAmpereSnapshot?: number;
+  fixedMonthlyPriceSnapshot?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -143,4 +146,41 @@ export interface MonthlyTariff {
   monthKey: string; // e.g. "2026-03"
   kwhPrice: number;
   updatedAt: string;
+}
+
+export interface CustomerBillingHistory {
+  entryId: string;
+  customerId: string;
+  monthKey: string;
+  billingType: BillingType;
+  subscribedAmpere: number;
+  fixedMonthlyPrice: number;
+  fixedDiscountAmount: number;
+  fixedDiscountPercent: number;
+  isMonitor: boolean;
+  reason: string;
+  updatedByRole: UserRole;
+  updatedAt: string;
+}
+
+export interface BillingChangeLog {
+  logId: string;
+  customerId: string;
+  monthKey: string;
+  oldProfileJson: string;
+  newProfileJson: string;
+  reason: string;
+  updatedByRole: UserRole;
+  updatedAt: string;
+}
+
+export interface BillingProfileForMonth {
+  customerId: string;
+  monthKey: string;
+  billingType: BillingType;
+  subscribedAmpere: number;
+  fixedMonthlyPrice: number;
+  fixedDiscountAmount: number;
+  fixedDiscountPercent: number;
+  isMonitor: boolean;
 }

@@ -3,12 +3,10 @@ export const dynamic = "force-dynamic";
 import {
   getAllCustomers,
   getAllBills,
-  getSettings,
-  getAmperePrices,
   getKwhPriceForMonth,
+  getSettings,
 } from "@/lib/google-sheets";
 import { ensureFixedMonthlyBillsForMonth } from "@/lib/fixed-monthly-auto-billing";
-import { getAmperePriceForTier } from "@/lib/billing";
 import Link from "next/link";
 import DashboardMonthSelect from "./DashboardMonthSelect";
 
@@ -31,13 +29,6 @@ function formatMonthKey(monthKey: string) {
   return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
 }
 
-function monthKeyFromDate(iso: string | undefined): string | null {
-  if (!iso) return null;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
-
 export default async function ManagerDashboardPage({
   searchParams,
 }: {
@@ -47,15 +38,12 @@ export default async function ManagerDashboardPage({
   const monthKey = params.month || getPreviousMonthKey();
   await ensureFixedMonthlyBillsForMonth(monthKey);
 
-  const [customers, bills, settings, ampereTiers] = await Promise.all([
+  const [customers, bills, settings, monthKwhPrice] = await Promise.all([
     getAllCustomers(),
     getAllBills(),
     getSettings(),
-    getAmperePrices(),
+    getKwhPriceForMonth(monthKey),
   ]);
-
-  // Default to previous month (billing period - you collect for Feb during March)
-  const monthKwhPrice = await getKwhPriceForMonth(monthKey);
   const monthBills = bills.filter((b) => b.monthKey === monthKey);
 
   const billMonths = Array.from(new Set(bills.map((b) => b.monthKey)));
@@ -64,132 +52,62 @@ export default async function ManagerDashboardPage({
   const allMonths = new Set([...billMonths, currentKey, previousKey]);
   const months = Array.from(allMonths).sort().reverse();
 
-  const monitorCustomerIds = new Set(
+  const monitorIds = new Set(
     customers.filter((c) => c.isMonitor).map((c) => c.customerId)
   );
-  const freeCustomerIds = new Set(
-    customers
-      .filter((c) => c.billingType === "FREE" && !monitorCustomerIds.has(c.customerId))
-      .map((c) => c.customerId)
-  );
-  const excludedFromBillingIds = new Set([
-    ...Array.from(freeCustomerIds),
-    ...Array.from(monitorCustomerIds),
-  ]);
-  const allPayingBills = bills.filter((b) => !excludedFromBillingIds.has(b.customerId));
-  const payingBills = monthBills.filter((b) => !excludedFromBillingIds.has(b.customerId));
-  const previousPayingBills = allPayingBills.filter(
-    (b) => b.monthKey < monthKey && b.remainingDue > 0
+  const freeIds = new Set(customers.filter((c) => c.billingType === "FREE").map((c) => c.customerId));
+  const excludedIds = new Set(
+    Array.from(freeIds).concat(Array.from(monitorIds))
   );
 
-  const totalBilled = payingBills.reduce((s, b) => s + b.totalDue, 0);
-  const totalCollected = payingBills.reduce((s, b) => s + b.totalPaid, 0);
-  const unpaidThisMonth = payingBills.reduce((s, b) => s + b.remainingDue, 0);
-  const unpaidPreviousMonths = previousPayingBills.reduce(
-    (s, b) => s + b.remainingDue,
-    0
+  const currentPayingBills = monthBills.filter((b) => !excludedIds.has(b.customerId));
+  const previousPayingBills = bills.filter(
+    (b) => b.monthKey < monthKey && !excludedIds.has(b.customerId) && b.remainingDue > 0
   );
-  const totalUnpaid = unpaidThisMonth + unpaidPreviousMonths;
 
-  const totalAmpereBilled = payingBills.reduce((s, b) => s + b.ampereCharge, 0);
-  const freeBillsThisMonth = monthBills.filter((b) => freeCustomerIds.has(b.customerId));
-  const monitorBillsThisMonth = monthBills.filter((b) => monitorCustomerIds.has(b.customerId));
-  const customerMap = new Map(customers.map((c) => [c.customerId, c]));
-  const freeAmpereExpected = freeBillsThisMonth.reduce((s, b) => {
-    const cust = customerMap.get(b.customerId);
-    if (!cust) return s;
-    return s + getAmperePriceForTier(cust.subscribedAmpere, ampereTiers);
-  }, 0);
-  const totalConsumptionBilled = payingBills.reduce(
-    (s, b) => s + b.consumptionCharge,
-    0
-  );
-  const totalFixedMonthlyBilled = payingBills.reduce((s, b) => {
-    const cust = customerMap.get(b.customerId);
-    return cust?.billingType === "FIXED_MONTHLY" ? s + b.totalDue : s;
-  }, 0);
-  const totalKwhPaying = payingBills.reduce((s, b) => s + b.usageKwh, 0);
-  const totalKwhFree = freeBillsThisMonth.reduce((s, b) => s + b.usageKwh, 0);
-  const kwhPrice = monthKwhPrice || settings.kwhPrice || 0;
-  const freeConsumptionExpected = freeBillsThisMonth.reduce((s, b) => {
-    const consumption = kwhPrice > 0 ? Math.round(b.usageKwh * kwhPrice) : b.consumptionCharge;
-    return s + consumption;
-  }, 0);
-  const freeFixedMonthlyExpected = freeBillsThisMonth.reduce((s, b) => {
-    const cust = customerMap.get(b.customerId);
-    return cust?.billingType === "FIXED_MONTHLY" ? s + b.totalDue : s;
-  }, 0);
-  const billByCustomerThisMonth = new Map(monthBills.map((b) => [b.customerId, b]));
+  const totalToBePaid = currentPayingBills.reduce((s, b) => s + b.totalDue, 0);
+  const collected = currentPayingBills.reduce((s, b) => s + b.totalPaid, 0);
+  const unpaidTotal = currentPayingBills.reduce((s, b) => s + b.remainingDue, 0);
+  const previousUnpaid = previousPayingBills.reduce((s, b) => s + b.remainingDue, 0);
+  const totalOwed = totalToBePaid + previousUnpaid;
+  const payingKwh = currentPayingBills.reduce((s, b) => s + b.usageKwh, 0);
+  const freeKwh = monthBills
+    .filter((b) => freeIds.has(b.customerId) && !monitorIds.has(b.customerId))
+    .reduce((s, b) => s + b.usageKwh, 0);
+  const kwhPrice = monthKwhPrice > 0 ? monthKwhPrice : settings.kwhPrice;
+  const billByCustomer = new Map(monthBills.map((b) => [b.customerId, b]));
   const monitorRows = customers.filter((c) => c.isMonitor);
-  const totalMonitorRedMatchKwh = monitorRows.reduce((sum, monitor) => {
-    const linkedIds = monitor.linkedCustomerIds?.length
+  const monitorExcessKwh = monitorRows.reduce((sum, monitor) => {
+    const links = monitor.linkedCustomerIds?.length
       ? monitor.linkedCustomerIds
       : monitor.linkedCustomerId
         ? [monitor.linkedCustomerId]
         : [];
-    if (linkedIds.length === 0) return sum;
-    const monitorBill = billByCustomerThisMonth.get(monitor.customerId);
-    const firstLinkedBill = billByCustomerThisMonth.get(linkedIds[0]);
-    const monitorKwh = (monitorBill ?? firstLinkedBill)?.usageKwh ?? 0;
-    const linkedIncludedKwh = linkedIds.reduce((s, linkedId) => {
-      const linkedCustomer = customerMap.get(linkedId);
-      if (!linkedCustomer || linkedCustomer.billingType !== "FIXED_MONTHLY") return s;
-      if (kwhPrice <= 0) return s;
-      return s + (linkedCustomer.fixedMonthlyPrice || 0) / kwhPrice;
+    if (links.length === 0) return sum;
+    const monitorBill = billByCustomer.get(monitor.customerId);
+    const firstLinkedBill = billByCustomer.get(links[0]);
+    const monitorUsage = (monitorBill ?? firstLinkedBill)?.usageKwh ?? 0;
+    const included = links.reduce((acc, linkedId) => {
+      const linked = customers.find((x) => x.customerId === linkedId);
+      if (!linked) return acc;
+      if (linked.billingType !== "FIXED_MONTHLY" || linked.isMonitor) return acc;
+      return acc + (kwhPrice > 0 ? linked.fixedMonthlyPrice / kwhPrice : 0);
     }, 0);
-    const matchKwh = monitorKwh - linkedIncludedKwh;
-    return sum + Math.max(0, matchKwh); // red (positive) only
+    return sum + Math.max(0, monitorUsage - included);
   }, 0);
-  const totalKwhFreeWithMonitorRed = totalKwhFree + totalMonitorRedMatchKwh;
-  const freeConsumptionExpectedWithMonitorRed =
-    freeConsumptionExpected + Math.round(totalMonitorRedMatchKwh * kwhPrice);
-
-  const unpaidThisMonthList = payingBills.filter((b) => b.remainingDue > 0);
-  const unpaidByPreviousMonth = previousPayingBills.reduce(
-    (acc, b) => {
-      const list = acc.get(b.monthKey) ?? [];
-      list.push(b);
-      acc.set(b.monthKey, list);
-      return acc;
-    },
-    new Map<string, typeof previousPayingBills>()
-  );
-
-  const customersExclMonitors = customers.filter((c) => !c.isMonitor);
-  const activeCustomers = customersExclMonitors.filter((c) => c.status === "ACTIVE");
-  const payingActiveCustomers = activeCustomers.filter(
-    (c) =>
-      c.billingType !== "FREE" &&
-      c.billingType !== "FIXED_MONTHLY" &&
-      !c.isMonitor
-  );
-  const freeCustomers = customers.filter((c) => c.billingType === "FREE");
-  const customersWithReadings = new Set(monthBills.map((b) => b.customerId));
-  const customersWithoutReading = payingActiveCustomers.filter(
-    (c) => {
-      if (customersWithReadings.has(c.customerId)) return false;
-      // Hide newly created customers (created after the selected month).
-      const createdMonthKey = monthKeyFromDate(c.createdAt);
-      if (!createdMonthKey) return true;
-      return createdMonthKey <= monthKey;
-    }
-  );
-
-  const totalMonitorKwh = monitorBillsThisMonth.reduce((s, b) => s + b.usageKwh, 0);
-  const totalMonitorAmount = monitorBillsThisMonth.reduce((s, b) => {
-    const consumption = kwhPrice > 0 ? Math.round(b.usageKwh * kwhPrice) : b.consumptionCharge;
-    return s + consumption;
-  }, 0);
+  const totalCustomers = customers.filter((c) => !c.isMonitor);
+  const activeCustomers = totalCustomers.filter((c) => c.status === "ACTIVE");
+  const monitorCount = customers.filter((c) => c.isMonitor).length;
 
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">
-            Manager Dashboard
+            Manager Home
           </h1>
           <p className="text-slate-500 mt-1">
-            Overview for {formatMonthKey(monthKey)}
+            High-level overview for {formatMonthKey(monthKey)}
           </p>
         </div>
         <div>
@@ -200,278 +118,78 @@ export default async function ManagerDashboardPage({
         </div>
       </div>
 
-      {/* Top row: counts and money */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mb-8">
         <div className="bg-white rounded-lg border border-slate-200 p-5">
-          <p className="text-sm text-slate-500">Total Customers</p>
-          <p className="text-2xl font-bold text-slate-800">{customersExclMonitors.length}</p>
+          <p className="text-sm text-slate-500">Total customers</p>
+          <p className="text-2xl font-bold text-slate-800 break-words leading-tight">
+            {totalCustomers.length.toLocaleString()}
+          </p>
           <p className="text-xs text-slate-400 mt-1">
-            {activeCustomers.length} active · {customersExclMonitors.length - activeCustomers.length} inactive
-            {monitorCustomerIds.size > 0 && ` · ${monitorCustomerIds.size} monitors`}
+            {activeCustomers.length} active · {totalCustomers.length - activeCustomers.length} inactive ·{" "}
+            {monitorCount} monitors
           </p>
         </div>
         <div className="bg-white rounded-lg border border-slate-200 p-5">
-          <p className="text-sm text-slate-500">Total Billed</p>
-          <p className="text-2xl font-bold text-slate-800">
-            {totalBilled.toLocaleString()}
-          </p>
-          <p className="text-xs text-slate-400 mt-1">
-            Billed for {formatMonthKey(monthKey)} (LBP)
+          <p className="text-sm text-slate-500">Total to be paid</p>
+          <p className="text-2xl font-bold text-slate-800 break-words leading-tight">
+            {totalToBePaid.toLocaleString()}
           </p>
         </div>
         <div className="bg-white rounded-lg border border-slate-200 p-5">
           <p className="text-sm text-slate-500">Collected</p>
-          <p className="text-2xl font-bold text-green-600">
-            {totalCollected.toLocaleString()}
-          </p>
-          <p className="text-xs text-slate-400 mt-1">
-            LBP received for {formatMonthKey(monthKey)}
+          <p className="text-2xl font-bold text-green-600 break-words leading-tight">
+            {collected.toLocaleString()}
           </p>
         </div>
         <div className="bg-white rounded-lg border border-slate-200 p-5">
-          <p className="text-sm text-slate-500">Unpaid Total</p>
-          <p className="text-2xl font-bold text-amber-600">
-            {totalUnpaid.toLocaleString()}
-          </p>
-          <p className="text-xs text-slate-400 mt-1">
-            {unpaidThisMonth.toLocaleString()} this month · {unpaidPreviousMonths.toLocaleString()} previous
+          <p className="text-sm text-slate-500">Unpaid total</p>
+          <p className="text-2xl font-bold text-amber-600 break-words leading-tight">
+            {unpaidTotal.toLocaleString()}
           </p>
         </div>
-      </div>
-
-      {/* Revenue breakdown: With free (paying only) */}
-      <div className="bg-white rounded-lg border border-slate-200 p-6 mb-8">
-        <h2 className="font-semibold text-slate-800 mb-4">
-          With Free ({formatMonthKey(monthKey)}) — Paying only
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-          <div>
-            <p className="text-sm text-slate-500">kWh (this month)</p>
-            <p className="text-xl font-bold text-slate-800">
-              {totalKwhPaying.toLocaleString()} kWh
-            </p>
-          </div>
-          <div>
-            <p className="text-sm text-slate-500">From Ampere</p>
-            <p className="text-xl font-bold text-slate-800">
-              {totalAmpereBilled.toLocaleString()} LBP
-            </p>
-          </div>
-          <div>
-            <p className="text-sm text-slate-500">From Consumption (kWh)</p>
-            <p className="text-xl font-bold text-slate-800">
-              {totalConsumptionBilled.toLocaleString()} LBP
-            </p>
-          </div>
-          <div>
-            <p className="text-sm text-slate-500">From Fixed Monthly (ma2touaa)</p>
-            <p className="text-xl font-bold text-slate-800">
-              {totalFixedMonthlyBilled.toLocaleString()} LBP
-            </p>
-          </div>
-          <div>
-            <p className="text-sm text-slate-500">Total Billed</p>
-            <p className="text-xl font-bold text-slate-800">
-              {totalBilled.toLocaleString()} LBP
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Revenue breakdown: Free customers only (hypothetical if charged) */}
-      <div className="bg-white rounded-lg border border-slate-200 p-6 mb-8">
-        <h2 className="font-semibold text-slate-800 mb-4">
-          If Free Charged ({formatMonthKey(monthKey)}) — Free customers only
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-          <div>
-            <p className="text-sm text-slate-500">kWh (this month)</p>
-            <p className="text-xl font-bold text-slate-800">
-              {totalKwhFreeWithMonitorRed.toLocaleString(undefined, {
-                maximumFractionDigits: 1,
-              })}{" "}
-              kWh
-            </p>
-            <p className="text-xs text-slate-500 mt-1">
-              Free kWh + monitor red match ({totalMonitorRedMatchKwh.toLocaleString(undefined, { maximumFractionDigits: 1 })} kWh)
-            </p>
-          </div>
-          <div>
-            <p className="text-sm text-slate-500">From Ampere</p>
-            <p className="text-xl font-bold text-slate-800">
-              {freeAmpereExpected.toLocaleString()} LBP
-            </p>
-          </div>
-          <div>
-            <p className="text-sm text-slate-500">From Consumption (kWh)</p>
-            <p className="text-xl font-bold text-slate-800">
-              {freeConsumptionExpectedWithMonitorRed.toLocaleString()} LBP
-            </p>
-          </div>
-          <div>
-            <p className="text-sm text-slate-500">From Fixed Monthly (ma2touaa)</p>
-            <p className="text-xl font-bold text-slate-800">
-              {freeFixedMonthlyExpected.toLocaleString()} LBP
-            </p>
-          </div>
-          <div>
-            <p className="text-sm text-slate-500">Total (hypothetical)</p>
-            <p className="text-xl font-bold text-slate-800">
-              {(freeAmpereExpected + freeConsumptionExpectedWithMonitorRed + freeFixedMonthlyExpected).toLocaleString()} LBP
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Monitors (tracked but not collected) */}
-      {monitorCustomerIds.size > 0 && (
-        <div className="bg-white rounded-lg border border-slate-200 p-6 mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-slate-800">
-              Monitors ({formatMonthKey(monthKey)})
-            </h2>
-            <Link
-              href={`/manager/monitors?month=${monthKey}`}
-              className="text-sm font-medium text-primary-600 hover:text-primary-700"
-            >
-              View full Monitors page →
-            </Link>
-          </div>
-          <p className="text-sm text-slate-500 mb-4">
-            Monitors tracked for usage. Excluded from payment collection.
+        <div className="bg-white rounded-lg border border-slate-200 p-5">
+          <p className="text-sm text-slate-500">Previous unpaid</p>
+          <p className="text-2xl font-bold text-slate-800 break-words leading-tight">
+            {previousUnpaid.toLocaleString()}
           </p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div>
-              <p className="text-sm text-slate-500">Monitors count</p>
-              <p className="text-xl font-bold text-slate-800">{monitorCustomerIds.size}</p>
-            </div>
-            <div>
-              <p className="text-sm text-slate-500">Total kWh (this month)</p>
-              <p className="text-xl font-bold text-slate-800">
-                {totalMonitorKwh.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm text-slate-500">Total amount (not collected)</p>
-              <p className="text-xl font-bold text-slate-800">
-                {totalMonitorAmount.toLocaleString()} LBP
-              </p>
-            </div>
-          </div>
         </div>
-      )}
-
-      {/* Unpaid breakdown: this month + previous months */}
-      <div className="bg-white rounded-lg border border-slate-200 p-6 mb-8">
-        <h2 className="font-semibold text-slate-800 mb-4">Unpaid Breakdown</h2>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div>
-            <h3 className="font-medium text-slate-700 mb-2">
-              Unpaid {formatMonthKey(monthKey)}
-            </h3>
-            <p className="text-sm text-slate-500 mb-3">
-              {unpaidThisMonthList.length} customer
-              {unpaidThisMonthList.length !== 1 ? "s" : ""} ·{" "}
-              {unpaidThisMonth.toLocaleString()} LBP
-            </p>
-            <div className="space-y-2 max-h-48 overflow-y-auto">
-              {unpaidThisMonthList.slice(0, 15).map((b) => {
-                const cust = customers.find((c) => c.customerId === b.customerId);
-                return (
-                  <Link
-                    key={b.billId}
-                    href={`/manager/customers/${b.customerId}`}
-                    className="flex justify-between py-2 border-b border-slate-100 last:border-0 hover:bg-slate-50 rounded px-2 -mx-2"
-                  >
-                    <span className="text-slate-700 truncate">
-                      {cust?.fullName || b.customerId}
-                    </span>
-                    <span className="font-medium text-amber-600">
-                      {b.remainingDue.toLocaleString()} LBP
-                    </span>
-                  </Link>
-                );
-              })}
-              {unpaidThisMonthList.length === 0 && (
-                <p className="text-slate-500 py-4">All paid for this month.</p>
-              )}
-              {unpaidThisMonthList.length > 15 && (
-                <p className="text-sm text-slate-400">
-                  <Link
-                    href={`/manager/reports/${monthKey}/unpaid`}
-                    className="text-primary-600 hover:underline"
-                  >
-                    View all {unpaidThisMonthList.length}
-                  </Link>
-                </p>
-              )}
-            </div>
-          </div>
-          <div>
-            <h3 className="font-medium text-slate-700 mb-2">
-              Unpaid Previous Months
-            </h3>
-            <p className="text-sm text-slate-500 mb-3">
-              {unpaidPreviousMonths > 0
-                ? `${unpaidPreviousMonths.toLocaleString()} LBP total`
-                : "No previous unpaid balance."}
-            </p>
-            <div className="space-y-3 max-h-48 overflow-y-auto">
-              {Array.from(unpaidByPreviousMonth.entries())
-                .sort(([a], [b]) => b.localeCompare(a))
-                .map(([mKey, billList]) => {
-                  const sum = billList.reduce((s, b) => s + b.remainingDue, 0);
-                  return (
-                    <div key={mKey} className="border-b border-slate-100 pb-2 last:border-0">
-                      <Link
-                        href={`/manager/reports/${mKey}/unpaid`}
-                        className="font-medium text-slate-700 hover:text-primary-600"
-                      >
-                        {formatMonthKey(mKey)}
-                      </Link>
-                      <span className="text-amber-600 ml-2 font-medium">
-                        {sum.toLocaleString()} LBP
-                      </span>
-                      <span className="text-slate-400 text-sm ml-2">
-                        ({billList.length} customer{billList.length !== 1 ? "s" : ""})
-                      </span>
-                    </div>
-                  );
-                })}
-              {unpaidByPreviousMonth.size === 0 && (
-                <p className="text-slate-500 py-4">None.</p>
-              )}
-            </div>
-          </div>
+        <div className="bg-white rounded-lg border border-slate-200 p-5">
+          <p className="text-sm text-slate-500">Total owed</p>
+          <p className="text-2xl font-bold text-rose-600 break-words leading-tight">
+            {totalOwed.toLocaleString()}
+          </p>
         </div>
       </div>
 
-      {/* Missing meter readings */}
       <div className="bg-white rounded-lg border border-slate-200 p-6 mb-8">
-        <h2 className="font-semibold text-slate-800 mb-4">
-          Missing Meter Readings
-        </h2>
-        <p className="text-sm text-slate-500 mb-4">
-          Paying meter-based customers with no reading recorded for{" "}
-          {formatMonthKey(monthKey)}. Fixed monthly (ma2touua) customers are not listed
-          here.
-        </p>
-        {customersWithoutReading.length > 0 ? (
-          <ul className="space-y-1 max-h-64 overflow-y-auto">
-            {customersWithoutReading.map((c) => (
-              <li key={c.customerId}>
-                <Link
-                  href={`/manager/customers/${c.customerId}`}
-                  className="text-slate-700 hover:text-primary-600"
-                >
-                  {c.fullName} – {c.area} {c.building}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-slate-500">All paying customers have readings.</p>
-        )}
+        <h2 className="font-semibold text-slate-800 mb-4">Quick insights</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <div className="rounded border border-slate-200 p-4">
+            <p className="text-sm text-slate-500">Paying kWh</p>
+            <p className="text-xl font-bold text-slate-800">{payingKwh.toLocaleString()} kWh</p>
+          </div>
+          <div className="rounded border border-slate-200 p-4">
+            <p className="text-sm text-slate-500">Free customers kWh</p>
+            <p className="text-xl font-bold text-slate-800">{freeKwh.toLocaleString()} kWh</p>
+          </div>
+          <div className="rounded border border-slate-200 p-4">
+            <p className="text-sm text-slate-500">Monitor excess (red match)</p>
+            <p className="text-xl font-bold text-rose-600">
+              {monitorExcessKwh.toLocaleString(undefined, { maximumFractionDigits: 1 })} kWh
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <Link href={`/manager/money?month=${monthKey}`} className="text-primary-600 font-medium hover:underline">
+            Open Money Dashboard →
+          </Link>
+          <Link href={`/manager/kwh?month=${monthKey}`} className="text-primary-600 font-medium hover:underline">
+            Open kWh Dashboard →
+          </Link>
+          <Link href={`/manager/monitors?month=${monthKey}`} className="text-primary-600 font-medium hover:underline">
+            Open Monitors →
+          </Link>
+        </div>
       </div>
     </div>
   );

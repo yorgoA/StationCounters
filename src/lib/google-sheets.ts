@@ -9,12 +9,17 @@ import { google } from "googleapis";
 import { getGoogleAuth } from "./google-auth";
 import {
   rowToAmperePriceTier,
+  rowToBillingChangeLog,
   rowToBill,
+  rowToCustomerBillingHistory,
   rowToCustomer,
   rowToPayment,
   rowToSettings,
   amperePriceTierToRow,
+  billingChangeLogToRow,
+  billingHistoryToProfile,
   billToRow,
+  customerBillingHistoryToRow,
   customerToRow,
   monthlyTariffToRow,
   paymentToRow,
@@ -23,7 +28,11 @@ import {
 } from "./sheets-utils";
 import type {
   AmperePriceTier,
+  BillingChangeLog,
+  BillingProfileForMonth,
   Bill,
+  BillingType,
+  CustomerBillingHistory,
   Customer,
   MonthlyTariff,
   Payment,
@@ -37,6 +46,8 @@ const SHEET_NAMES = {
   PAYMENTS: "Payments",
   SETTINGS: "Settings",
   MONTHLY_TARIFFS: "MonthlyTariffs",
+  CUSTOMER_BILLING_HISTORY: "CustomerBillingHistory",
+  BILLING_CHANGE_LOG: "BillingChangeLog",
 } as const;
 
 const DEFAULT_AMPERE_PRICES: AmperePriceTier[] = [
@@ -155,6 +166,26 @@ async function updateRow(sheetName: string, rowIndex: number, values: string[]) 
   });
 }
 
+async function ensureSheetWithHeader(sheetName: string, headers: string[]) {
+  const { sheets, spreadsheetId } = await getSheets();
+  const meta = await sheets.spreadsheets.get({ spreadsheetId });
+  const hasSheet = meta.data.sheets?.some((s) => s.properties?.title === sheetName);
+  if (!hasSheet) {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        requests: [{ addSheet: { properties: { title: sheetName } } }],
+      },
+    });
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `${sheetName}!A1`,
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values: [headers] },
+    });
+  }
+}
+
 // -----------------------------------------------------------------------------
 // CUSTOMERS
 // -----------------------------------------------------------------------------
@@ -237,6 +268,13 @@ export async function getAllPayments(): Promise<Payment[]> {
 export async function getPaymentsByBill(billId: string): Promise<Payment[]> {
   const payments = await getAllPayments();
   return payments.filter((p) => p.billId === billId);
+}
+
+export async function getPaymentsByBillIds(billIds: string[]): Promise<Payment[]> {
+  const ids = new Set(billIds.map((x) => String(x).trim()).filter(Boolean));
+  if (ids.size === 0) return [];
+  const payments = await getAllPayments();
+  return payments.filter((p) => ids.has(p.billId));
 }
 
 export async function createPayment(payment: Payment): Promise<void> {
@@ -428,5 +466,104 @@ export async function upsertMonthlyTariff(monthKey: string, kwhPrice: number): P
     await appendRow(SHEET_NAMES.MONTHLY_TARIFFS, row);
   } else {
     await updateRow(SHEET_NAMES.MONTHLY_TARIFFS, idx + 1, row);
+  }
+}
+
+export async function getBillingHistoryByCustomer(
+  customerId: string
+): Promise<CustomerBillingHistory[]> {
+  try {
+    const rows = await getRange(SHEET_NAMES.CUSTOMER_BILLING_HISTORY);
+    if (rows.length < 2) return [];
+    return rows
+      .slice(1)
+      .map(rowToCustomerBillingHistory)
+      .filter((r) => r.customerId === customerId && r.monthKey)
+      .sort((a, b) => b.monthKey.localeCompare(a.monthKey));
+  } catch {
+    return [];
+  }
+}
+
+export async function upsertBillingHistoryEntry(entry: CustomerBillingHistory): Promise<void> {
+  await ensureSheetWithHeader(SHEET_NAMES.CUSTOMER_BILLING_HISTORY, [
+    "entryId",
+    "customerId",
+    "monthKey",
+    "billingType",
+    "subscribedAmpere",
+    "fixedMonthlyPrice",
+    "fixedDiscountAmount",
+    "fixedDiscountPercent",
+    "isMonitor",
+    "reason",
+    "updatedByRole",
+    "updatedAt",
+  ]);
+  const rows = await getRange(SHEET_NAMES.CUSTOMER_BILLING_HISTORY, "A:L");
+  const idx = rows.findIndex(
+    (r, i) =>
+      i > 0 &&
+      String(r[1] || "").trim() === entry.customerId &&
+      String(r[2] || "").trim() === entry.monthKey
+  );
+  const row = customerBillingHistoryToRow(entry);
+  if (idx === -1) {
+    await appendRow(SHEET_NAMES.CUSTOMER_BILLING_HISTORY, row);
+  } else {
+    await updateRow(SHEET_NAMES.CUSTOMER_BILLING_HISTORY, idx + 1, row);
+  }
+}
+
+export async function getBillingProfileForMonth(
+  customerId: string,
+  monthKey: string
+): Promise<BillingProfileForMonth | null> {
+  const customer = await getCustomerById(customerId);
+  if (!customer) return null;
+  const history = await getBillingHistoryByCustomer(customerId);
+  const match = history.find((x) => x.monthKey === monthKey);
+  if (match) {
+    return billingHistoryToProfile(match);
+  }
+  return {
+    customerId,
+    monthKey,
+    billingType: (customer.billingType || "BOTH") as BillingType,
+    subscribedAmpere: customer.subscribedAmpere,
+    fixedMonthlyPrice: customer.fixedMonthlyPrice ?? 0,
+    fixedDiscountAmount: customer.fixedDiscountAmount ?? 0,
+    fixedDiscountPercent: customer.fixedDiscountPercent ?? 0,
+    isMonitor: customer.isMonitor === true,
+  };
+}
+
+export async function appendBillingChangeLog(log: BillingChangeLog): Promise<void> {
+  await ensureSheetWithHeader(SHEET_NAMES.BILLING_CHANGE_LOG, [
+    "logId",
+    "customerId",
+    "monthKey",
+    "oldProfileJson",
+    "newProfileJson",
+    "reason",
+    "updatedByRole",
+    "updatedAt",
+  ]);
+  await appendRow(SHEET_NAMES.BILLING_CHANGE_LOG, billingChangeLogToRow(log));
+}
+
+export async function getBillingChangeLogsByCustomer(
+  customerId: string
+): Promise<BillingChangeLog[]> {
+  try {
+    const rows = await getRange(SHEET_NAMES.BILLING_CHANGE_LOG);
+    if (rows.length < 2) return [];
+    return rows
+      .slice(1)
+      .map(rowToBillingChangeLog)
+      .filter((x) => x.customerId === customerId)
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  } catch {
+    return [];
   }
 }

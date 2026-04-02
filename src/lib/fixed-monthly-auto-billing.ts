@@ -1,5 +1,12 @@
 import { calcBillFromReadings } from "@/lib/billing";
-import { createBill, getAllBills, getAllCustomers, getAmperePrices, getKwhPriceForMonth } from "@/lib/google-sheets";
+import {
+  createBill,
+  getAllBills,
+  getAllCustomers,
+  getAmperePrices,
+  getBillingProfileForMonth,
+  getKwhPriceForMonth,
+} from "@/lib/google-sheets";
 import { generateId } from "@/lib/id";
 import type { Bill, Customer } from "@/types";
 
@@ -9,9 +16,13 @@ const CHECK_TTL_MS = 60_000;
 const recentChecks = new Map<string, number>();
 const inflightChecks = new Map<string, Promise<EnsureResult>>();
 
-function getPreviousUnpaidBalance(bills: Bill[]): number {
+function getPreviousUnpaidBalance(bills: Bill[], monthKey: string): number {
   const unpaid = bills
-    .filter((b) => b.paymentStatus === "UNPAID" || b.paymentStatus === "PARTIAL")
+    .filter(
+      (b) =>
+        (b.paymentStatus === "UNPAID" || b.paymentStatus === "PARTIAL") &&
+        b.monthKey < monthKey
+    )
     .sort((a, b) => b.monthKey.localeCompare(a.monthKey));
   return unpaid[0]?.remainingDue ?? 0;
 }
@@ -24,11 +35,7 @@ function latestCounterForCustomer(bills: Bill[], customerId: string): number {
 }
 
 function isEligibleFixedMonthly(customer: Customer): boolean {
-  return (
-    customer.billingType === "FIXED_MONTHLY" &&
-    customer.status === "ACTIVE" &&
-    !customer.isMonitor
-  );
+  return customer.status === "ACTIVE" && !customer.isMonitor;
 }
 
 export async function ensureFixedMonthlyBillsForMonth(monthKey: string): Promise<EnsureResult> {
@@ -59,10 +66,15 @@ export async function ensureFixedMonthlyBillsForMonth(monthKey: string): Promise
     // Sequential writes are safer for Sheets API quotas.
     for (const customer of fixedMonthlyCustomers) {
       if (existingForMonth.has(customer.customerId)) continue;
+      const profile = await getBillingProfileForMonth(customer.customerId, monthKey);
+      if (!profile) continue;
+      const effectiveBillingType = profile.isMonitor ? "FREE" : profile.billingType;
+      if (effectiveBillingType !== "FIXED_MONTHLY") continue;
 
       const previousCounter = latestCounterForCustomer(bills, customer.customerId);
       const previousUnpaid = getPreviousUnpaidBalance(
-        bills.filter((b) => b.customerId === customer.customerId)
+        bills.filter((b) => b.customerId === customer.customerId),
+        monthKey
       );
 
       const calc = calcBillFromReadings(
@@ -70,11 +82,11 @@ export async function ensureFixedMonthlyBillsForMonth(monthKey: string): Promise
         monthKey,
         previousCounter,
         previousCounter,
-        customer.subscribedAmpere,
-        customer.billingType,
-        customer.fixedMonthlyPrice ?? 0,
-        customer.fixedDiscountAmount ?? 0,
-        customer.fixedDiscountPercent ?? 0,
+        profile.subscribedAmpere,
+        effectiveBillingType,
+        profile.fixedMonthlyPrice ?? 0,
+        profile.fixedDiscountAmount ?? 0,
+        profile.fixedDiscountPercent ?? 0,
         ampereTiers,
         kwhPrice,
         previousUnpaid
@@ -83,6 +95,9 @@ export async function ensureFixedMonthlyBillsForMonth(monthKey: string): Promise
       const bill: Bill = {
         ...calc,
         billId: generateId("bill"),
+        billingTypeSnapshot: effectiveBillingType,
+        subscribedAmpereSnapshot: profile.subscribedAmpere,
+        fixedMonthlyPriceSnapshot: profile.fixedMonthlyPrice,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };

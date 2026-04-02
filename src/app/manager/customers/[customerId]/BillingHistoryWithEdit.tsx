@@ -1,13 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import type { Bill } from "@/types";
+import type { Bill, Payment } from "@/types";
 import EditBillForm from "./EditBillForm";
 import { useRouter } from "next/navigation";
 import { deleteBillAction } from "@/app/actions/bill";
 
-export default function BillingHistoryWithEdit({ bills }: { bills: Bill[] }) {
+export default function BillingHistoryWithEdit({
+  bills,
+  payments,
+}: {
+  bills: Bill[];
+  payments: Payment[];
+}) {
   const [editingBillId, setEditingBillId] = useState<string | null>(null);
+  const [expandedBillId, setExpandedBillId] = useState<string | null>(null);
   const editingBill = bills.find((b) => b.billId === editingBillId);
   const router = useRouter();
   const [error, setError] = useState<string>("");
@@ -37,16 +44,35 @@ export default function BillingHistoryWithEdit({ bills }: { bills: Bill[] }) {
               onCancel={() => setEditingBillId(null)}
             />
           ) : (
-            <div className="flex justify-between items-center">
-              <span className="text-slate-700">{b.monthKey}</span>
-              <div className="flex items-center gap-3">
-                <span className="text-slate-600">
+            <div className="space-y-2">
+              <div className="min-w-0 space-y-2">
+                <p className="text-slate-800 font-semibold">{b.monthKey}</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-slate-600">
+                  <p className="break-words">Type: {b.billingTypeSnapshot || "—"}</p>
+                  <p className="break-words">Due: {b.totalDue.toLocaleString()}</p>
+                  <p className="break-words">Paid: {b.totalPaid.toLocaleString()}</p>
+                  <p className="break-words">
+                    Carry-in: {b.previousUnpaidBalance.toLocaleString()}
+                  </p>
+                </div>
+                <p className="text-slate-600">
                   {b.remainingDue > 0 ? (
                     <span className="text-amber-600">{b.remainingDue.toLocaleString()} due</span>
                   ) : (
                     <span className="text-green-600">Paid</span>
                   )}
-                </span>
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3 pt-1 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setExpandedBillId((prev) => (prev === b.billId ? null : b.billId))
+                  }
+                  className="text-xs text-slate-600 hover:text-slate-800"
+                >
+                  Payments
+                </button>
                 <button
                   type="button"
                   onClick={() => setEditingBillId(b.billId)}
@@ -62,6 +88,34 @@ export default function BillingHistoryWithEdit({ bills }: { bills: Bill[] }) {
                   Delete
                 </button>
               </div>
+              {expandedBillId === b.billId && (
+                <div className="rounded border border-slate-200 bg-slate-50 p-3">
+                  {payments.filter((p) => p.billId === b.billId).length === 0 ? (
+                    <p className="text-xs text-slate-500">No payments for this bill.</p>
+                  ) : (
+                    <div className="space-y-1">
+                      {payments
+                        .filter((p) => p.billId === b.billId)
+                        .sort((a, z) => z.paymentDate.localeCompare(a.paymentDate))
+                        .map((p) => (
+                          <div key={p.paymentId} className="text-xs text-slate-700">
+                            {p.paymentDate} • {p.amountPaid.toLocaleString()} • {p.paymentMethod || "—"}
+                            {p.receiptImageUrl ? (
+                              <a
+                                href={p.receiptImageUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="ml-2 text-primary-600 hover:underline"
+                              >
+                                Receipt
+                              </a>
+                            ) : null}
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>

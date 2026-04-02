@@ -4,8 +4,11 @@
 
 import type {
   AmperePriceTier,
+  BillingChangeLog,
+  BillingProfileForMonth,
   Bill,
   BillingType,
+  CustomerBillingHistory,
   Customer,
   MonthlyTariff,
   Payment,
@@ -105,6 +108,9 @@ export function rowToBill(row: string[]): Bill {
     paymentStatus: (r[15] || "UNPAID") as Bill["paymentStatus"],
     createdAt: r[16] || "",
     updatedAt: r[17] || "",
+    billingTypeSnapshot: normalizeBillingType(r[18]),
+    subscribedAmpereSnapshot: parseFloat(r[19] || "0") || 0,
+    fixedMonthlyPriceSnapshot: parseFloat(r[20] || "0") || 0,
   };
 }
 
@@ -128,6 +134,9 @@ export function billToRow(b: Bill): string[] {
     b.paymentStatus,
     b.createdAt,
     b.updatedAt,
+    b.billingTypeSnapshot ?? "",
+    String(b.subscribedAmpereSnapshot ?? 0),
+    String(b.fixedMonthlyPriceSnapshot ?? 0),
   ];
 }
 
@@ -203,4 +212,79 @@ export function rowToMonthlyTariff(row: string[]): MonthlyTariff {
 
 export function monthlyTariffToRow(t: MonthlyTariff): string[] {
   return [t.monthKey, String(t.kwhPrice), t.updatedAt];
+}
+
+export function rowToCustomerBillingHistory(row: string[]): CustomerBillingHistory {
+  const r = row as unknown as string[];
+  return {
+    entryId: String(r[0] || "").trim(),
+    customerId: String(r[1] || "").trim(),
+    monthKey: String(r[2] || "").trim(),
+    billingType: normalizeBillingType(r[3]),
+    subscribedAmpere: parseFloat(r[4] || "0") || 0,
+    fixedMonthlyPrice: parseFloat(r[5] || "0") || 0,
+    fixedDiscountAmount: parseFloat(r[6] || "0") || 0,
+    fixedDiscountPercent: parseFloat(r[7] || "0") || 0,
+    isMonitor: r[8] === "true" || r[8] === "1",
+    reason: r[9] || "",
+    updatedByRole: (r[10] || "manager") as CustomerBillingHistory["updatedByRole"],
+    updatedAt: r[11] || "",
+  };
+}
+
+export function customerBillingHistoryToRow(e: CustomerBillingHistory): string[] {
+  return [
+    e.entryId,
+    e.customerId,
+    e.monthKey,
+    e.billingType,
+    String(e.subscribedAmpere),
+    String(e.fixedMonthlyPrice),
+    String(e.fixedDiscountAmount),
+    String(e.fixedDiscountPercent),
+    e.isMonitor ? "true" : "false",
+    e.reason || "",
+    e.updatedByRole,
+    e.updatedAt,
+  ];
+}
+
+export function rowToBillingChangeLog(row: string[]): BillingChangeLog {
+  const r = row as unknown as string[];
+  return {
+    logId: String(r[0] || "").trim(),
+    customerId: String(r[1] || "").trim(),
+    monthKey: String(r[2] || "").trim(),
+    oldProfileJson: r[3] || "",
+    newProfileJson: r[4] || "",
+    reason: r[5] || "",
+    updatedByRole: (r[6] || "manager") as BillingChangeLog["updatedByRole"],
+    updatedAt: r[7] || "",
+  };
+}
+
+export function billingChangeLogToRow(log: BillingChangeLog): string[] {
+  return [
+    log.logId,
+    log.customerId,
+    log.monthKey,
+    log.oldProfileJson,
+    log.newProfileJson,
+    log.reason || "",
+    log.updatedByRole,
+    log.updatedAt,
+  ];
+}
+
+export function billingHistoryToProfile(entry: CustomerBillingHistory): BillingProfileForMonth {
+  return {
+    customerId: entry.customerId,
+    monthKey: entry.monthKey,
+    billingType: entry.billingType,
+    subscribedAmpere: entry.subscribedAmpere,
+    fixedMonthlyPrice: entry.fixedMonthlyPrice,
+    fixedDiscountAmount: entry.fixedDiscountAmount,
+    fixedDiscountPercent: entry.fixedDiscountPercent,
+    isMonitor: entry.isMonitor,
+  };
 }

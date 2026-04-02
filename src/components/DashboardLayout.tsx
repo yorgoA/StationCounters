@@ -17,7 +17,9 @@ const employeeNav = [
 ];
 
 const managerNav = [
-  { href: "/manager", label: "Dashboard" },
+  { href: "/manager", label: "Home" },
+  { href: "/manager/money", label: "Money" },
+  { href: "/manager/kwh", label: "kWh" },
   { href: "/manager/monitors", label: "Monitors" },
   { href: "/manager/reports", label: "Reports" },
   { href: "/manager/customers", label: "Customers" },
