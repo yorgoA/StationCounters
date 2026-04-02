@@ -9,6 +9,13 @@ function getCurrentMonthKey() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 }
 
+function monthKeyFromDate(iso: string | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
 export default async function EmployeeReadingsPage({
   searchParams,
 }: {
@@ -25,7 +32,13 @@ export default async function EmployeeReadingsPage({
     bills.filter((b) => b.monthKey === monthKey).map((b) => b.customerId)
   );
   const pendingCustomers = activeCustomers.filter(
-    (c) => !alreadyRecordedIds.has(c.customerId)
+    (c) => {
+      if (alreadyRecordedIds.has(c.customerId)) return false;
+      // If the customer was created after the selected month, they shouldn't show up as "missing".
+      const createdMonthKey = monthKeyFromDate(c.createdAt);
+      if (!createdMonthKey) return true;
+      return createdMonthKey <= monthKey;
+    }
   );
 
   return (
