@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { ensureFixedMonthlyBillsForMonth } from "@/lib/fixed-monthly-auto-billing";
 import { getAllBills, getAllCustomers } from "@/lib/google-sheets";
+import type { BillingType } from "@/types";
 import MoneyMonthSelect from "./MoneyMonthSelect";
 
 function getCurrentMonthKey() {
@@ -61,15 +62,29 @@ export default async function ManagerMoneyPage({
     (s, b) => s + Math.max(0, b.totalPaid - b.totalDue),
     0
   );
-  const overpaidRows = monthPayingBills
-    .filter((b) => b.totalPaid > b.totalDue)
+  const unpaidRows = monthPayingBills
+    .filter((b) => b.remainingDue > 0)
     .map((b) => ({
       billId: b.billId,
       customerId: b.customerId,
       customerName: customerMap.get(b.customerId)?.fullName || b.customerId,
-      overpaid: b.totalPaid - b.totalDue,
+      unpaid: b.remainingDue,
     }))
-    .sort((a, b) => b.overpaid - a.overpaid);
+    .sort((a, b) => b.unpaid - a.unpaid);
+
+  const byBillingType: Record<BillingType, number> = {
+    BOTH: 0,
+    KWH_ONLY: 0,
+    AMPERE_ONLY: 0,
+    FIXED_MONTHLY: 0,
+    FREE: 0,
+  };
+  for (const b of monthPayingBills) {
+    const t = (b.billingTypeSnapshot ||
+      customerMap.get(b.customerId)?.billingType ||
+      "BOTH") as BillingType;
+    byBillingType[t] = (byBillingType[t] || 0) + b.totalDue;
+  }
 
   return (
     <div>
@@ -108,20 +123,50 @@ export default async function ManagerMoneyPage({
       </div>
 
       <div className="bg-white rounded-lg border border-slate-200 p-6">
-        <h2 className="font-semibold text-slate-800 mb-4">Overpaid customers</h2>
-        {overpaidRows.length === 0 ? (
-          <p className="text-slate-500">No overpaid bills this month.</p>
+        <h2 className="font-semibold text-slate-800 mb-4">Total to be paid breakdown</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div className="rounded border border-slate-200 p-4">
+            <p className="text-sm text-slate-500">Both</p>
+            <p className="text-xl font-bold text-slate-800">
+              {byBillingType.BOTH.toLocaleString()} LBP
+            </p>
+          </div>
+          <div className="rounded border border-slate-200 p-4">
+            <p className="text-sm text-slate-500">kWh only</p>
+            <p className="text-xl font-bold text-slate-800">
+              {byBillingType.KWH_ONLY.toLocaleString()} LBP
+            </p>
+          </div>
+          <div className="rounded border border-slate-200 p-4">
+            <p className="text-sm text-slate-500">Ampere only</p>
+            <p className="text-xl font-bold text-slate-800">
+              {byBillingType.AMPERE_ONLY.toLocaleString()} LBP
+            </p>
+          </div>
+          <div className="rounded border border-slate-200 p-4">
+            <p className="text-sm text-slate-500">Fixed monthly</p>
+            <p className="text-xl font-bold text-slate-800">
+              {byBillingType.FIXED_MONTHLY.toLocaleString()} LBP
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-lg border border-slate-200 p-6 mt-8">
+        <h2 className="font-semibold text-slate-800 mb-4">Unpaid customers</h2>
+        {unpaidRows.length === 0 ? (
+          <p className="text-slate-500">No unpaid bills this month.</p>
         ) : (
           <div className="space-y-2">
-            {overpaidRows.map((r) => (
+            {unpaidRows.map((r) => (
               <Link
                 key={r.billId}
                 href={`/manager/customers/${r.customerId}`}
                 className="flex items-center justify-between rounded border border-slate-200 px-3 py-2 hover:bg-slate-50"
               >
                 <span className="text-slate-800">{r.customerName}</span>
-                <span className="font-medium text-indigo-700">
-                  {r.overpaid.toLocaleString()} LBP
+                <span className="font-medium text-amber-700">
+                  {r.unpaid.toLocaleString()} LBP
                 </span>
               </Link>
             ))}

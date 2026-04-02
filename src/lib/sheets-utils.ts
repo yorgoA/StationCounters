@@ -30,6 +30,20 @@ export function normalizeBillingType(raw: string | undefined): BillingType {
   return "BOTH";
 }
 
+function parseBillingTypeSnapshot(raw: string | undefined): BillingType | undefined {
+  const t = (raw ?? "").trim().toUpperCase();
+  if (
+    t === "AMPERE_ONLY" ||
+    t === "KWH_ONLY" ||
+    t === "BOTH" ||
+    t === "FREE" ||
+    t === "FIXED_MONTHLY"
+  ) {
+    return t;
+  }
+  return undefined;
+}
+
 export function rowToCustomer(row: string[]): Customer {
   const r = row as unknown as string[];
   return {
@@ -108,7 +122,7 @@ export function rowToBill(row: string[]): Bill {
     paymentStatus: (r[15] || "UNPAID") as Bill["paymentStatus"],
     createdAt: r[16] || "",
     updatedAt: r[17] || "",
-    billingTypeSnapshot: normalizeBillingType(r[18]),
+    billingTypeSnapshot: parseBillingTypeSnapshot(r[18]),
     subscribedAmpereSnapshot: parseFloat(r[19] || "0") || 0,
     fixedMonthlyPriceSnapshot: parseFloat(r[20] || "0") || 0,
   };
