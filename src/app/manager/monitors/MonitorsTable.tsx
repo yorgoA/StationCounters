@@ -9,8 +9,8 @@ type LinkedRef = {
   fullName: string;
   area: string;
   building: string;
-  kwh: number;
-  amp: number;
+  billedKwh: number;
+  includedKwh: number;
 };
 
 type MonitorRow = {
@@ -21,11 +21,17 @@ type MonitorRow = {
   monitorCategory: string;
   links: LinkedRef[];
   monitorKwh: number;
-  linkedKwh: number;
-  linkedAmp: number;
+  linkedIncludedKwh: number;
+  matchKwh: number;
 };
 
-export default function MonitorsTable({ rows }: { rows: MonitorRow[] }) {
+export default function MonitorsTable({
+  rows,
+  monthKwhPrice,
+}: {
+  rows: MonitorRow[];
+  monthKwhPrice: number;
+}) {
   const [q, setQ] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
 
@@ -98,10 +104,7 @@ export default function MonitorsTable({ rows }: { rows: MonitorRow[] }) {
                   Monitor kWh
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-slate-600 uppercase tracking-wider">
-                  Linked kWh
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-slate-600 uppercase tracking-wider">
-                  Linked Amp
+                  Linked kWh (included)
                 </th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-slate-600 uppercase tracking-wider">
                   Match
@@ -110,7 +113,7 @@ export default function MonitorsTable({ rows }: { rows: MonitorRow[] }) {
             </thead>
             <tbody className="divide-y divide-slate-200">
               {filtered.map((r) => {
-                const match = r.monitorKwh === r.linkedKwh;
+                const matchKwh = r.matchKwh;
                 return (
                   <tr key={r.customerId} className="hover:bg-slate-50">
                     <td className="px-4 py-3">
@@ -145,7 +148,8 @@ export default function MonitorsTable({ rows }: { rows: MonitorRow[] }) {
                                 {l.fullName}
                               </Link>
                               <span className="text-slate-500 text-xs ml-1">
-                                {l.kwh.toLocaleString()} kWh
+                                actual: {l.billedKwh.toLocaleString(undefined, { maximumFractionDigits: 1 })} kWh ·
+                                included: {l.includedKwh.toLocaleString(undefined, { maximumFractionDigits: 1 })} kWh
                               </span>
                             </div>
                           ))}
@@ -158,25 +162,25 @@ export default function MonitorsTable({ rows }: { rows: MonitorRow[] }) {
                       {r.monitorKwh.toLocaleString()} kWh
                     </td>
                     <td className="px-4 py-3 text-right font-medium">
-                      {r.linkedKwh.toLocaleString()} kWh
-                    </td>
-                    <td className="px-4 py-3 text-right text-slate-600">
-                      {r.linkedAmp.toLocaleString()}
+                      {r.linkedIncludedKwh.toLocaleString(undefined, { maximumFractionDigits: 1 })} kWh
                     </td>
                     <td className="px-4 py-3 text-center">
-                      {match ? (
-                        <span className="text-green-600 text-sm">✓</span>
-                      ) : (
-                        <span className="text-amber-600 text-sm">
-                          {(r.monitorKwh - r.linkedKwh).toLocaleString()} kWh
-                        </span>
-                      )}
+                      <span
+                        className={`text-sm font-medium ${
+                          matchKwh > 0 ? "text-red-600" : matchKwh < 0 ? "text-green-600" : "text-slate-600"
+                        }`}
+                      >
+                        {matchKwh.toLocaleString(undefined, { maximumFractionDigits: 1 })} kWh
+                      </span>
                     </td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
+        </div>
+        <div className="px-4 py-3 border-t border-slate-200 bg-slate-50 text-xs text-slate-600">
+          Linked included kWh = fixed monthly amount / monthly tariff ({monthKwhPrice.toLocaleString()} LBP per kWh).
         </div>
         {filtered.length === 0 && (
           <div className="py-8 text-center text-slate-500">

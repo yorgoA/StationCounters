@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 
-import { getAllCustomers, getAllBills } from "@/lib/google-sheets";
+import { getAllCustomers, getAllBills, getKwhPriceForMonth } from "@/lib/google-sheets";
 import MonitorsMonthSelect from "./MonitorsMonthSelect";
 import MonitorsTable from "./MonitorsTable";
 
@@ -35,6 +35,7 @@ export default async function MonitorsPage({
   ]);
 
   const monthKey = params.month || getPreviousMonthKey();
+  const monthKwhPrice = await getKwhPriceForMonth(monthKey);
   const monthBills = bills.filter((b) => b.monthKey === monthKey);
 
   const billMonths = Array.from(new Set(bills.map((b) => b.monthKey)));
@@ -51,7 +52,14 @@ export default async function MonitorsPage({
   const customerMap = new Map(customers.map((c) => [c.customerId, c]));
   const billByCustomer = new Map(monthBills.map((b) => [b.customerId, b]));
 
-  type LinkedRef = { customerId: string; fullName: string; area: string; building: string; kwh: number; amp: number };
+  type LinkedRef = {
+    customerId: string;
+    fullName: string;
+    area: string;
+    building: string;
+    billedKwh: number;
+    includedKwh: number;
+  };
 
   type MonitorRow = {
     customerId: string;
@@ -61,8 +69,8 @@ export default async function MonitorsPage({
     monitorCategory: string;
     links: LinkedRef[];
     monitorKwh: number;
-    linkedKwh: number;
-    linkedAmp: number;
+    linkedIncludedKwh: number;
+    matchKwh: number;
   };
 
   const rows: MonitorRow[] = monitors.map((m) => {
@@ -75,19 +83,22 @@ export default async function MonitorsPage({
     const links: LinkedRef[] = ids.map((id) => {
       const cust = customerMap.get(id);
       const b = billByCustomer.get(id);
+      const fixedMonthlyPrice = cust?.fixedMonthlyPrice ?? 0;
+      const includedKwh =
+        monthKwhPrice > 0 ? fixedMonthlyPrice / monthKwhPrice : 0;
       return {
         customerId: id,
         fullName: cust?.fullName ?? id,
         area: cust?.area ?? "",
         building: cust?.building ?? "",
-        kwh: b?.usageKwh ?? 0,
-        amp: b?.ampereCharge ?? 0,
+        billedKwh: b?.usageKwh ?? 0,
+        includedKwh,
       };
     });
-    const linkedKwh = links.reduce((s, l) => s + l.kwh, 0);
-    const linkedAmp = links.reduce((s, l) => s + l.amp, 0);
+    const linkedIncludedKwh = links.reduce((s, l) => s + l.includedKwh, 0);
     const firstLinkedBill = ids[0] ? billByCustomer.get(ids[0]) : null;
     const effectiveMonitorBill = monitorBill ?? firstLinkedBill;
+    const monitorKwh = effectiveMonitorBill?.usageKwh ?? 0;
     return {
       customerId: m.customerId,
       fullName: m.fullName,
@@ -95,15 +106,15 @@ export default async function MonitorsPage({
       building: m.building,
       monitorCategory: m.monitorCategory ?? "",
       links,
-      monitorKwh: effectiveMonitorBill?.usageKwh ?? 0,
-      linkedKwh,
-      linkedAmp,
+      monitorKwh,
+      linkedIncludedKwh,
+      matchKwh: monitorKwh - linkedIncludedKwh,
     };
   });
 
   const totalMonitorKwh = rows.reduce((s, r) => s + r.monitorKwh, 0);
-  const totalLinkedKwh = rows.reduce((s, r) => s + r.linkedKwh, 0);
-  const totalLinkedAmp = rows.reduce((s, r) => s + r.linkedAmp, 0);
+  const totalLinkedIncludedKwh = rows.reduce((s, r) => s + r.linkedIncludedKwh, 0);
+  const totalMatchKwh = rows.reduce((s, r) => s + r.matchKwh, 0);
 
   return (
     <div>
@@ -111,7 +122,7 @@ export default async function MonitorsPage({
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Monitors</h1>
           <p className="text-slate-500 mt-1">
-            Track usage per monitor vs linked customer for theft detection. Monitors can be on any customer type.
+            Compare monitor usage vs linked fixed-plan kWh allowance for theft detection.
           </p>
         </div>
         <div>
@@ -143,24 +154,25 @@ export default async function MonitorsPage({
             <div className="bg-white rounded-lg border border-slate-200 p-5">
               <p className="text-sm text-slate-500">Linked total</p>
               <p className="text-xl font-bold text-slate-800">
-                {totalLinkedKwh.toLocaleString()} kWh
+                {totalLinkedIncludedKwh.toLocaleString(undefined, { maximumFractionDigits: 1 })} kWh
               </p>
-              <p className="text-sm text-slate-600">{totalLinkedAmp.toLocaleString()} LBP amp</p>
+              <p className="text-sm text-slate-600">
+                From fixed monthly / {monthKwhPrice.toLocaleString()} LBP per kWh
+              </p>
             </div>
             <div className="bg-white rounded-lg border border-slate-200 p-5">
-              <p className="text-sm text-slate-500">Match (kWh only)</p>
-              <p className="text-xl font-bold text-slate-800">
-                {totalMonitorKwh === totalLinkedKwh ? "✓ Equal" : "≠ Diff"}
+              <p className="text-sm text-slate-500">Match (monitor - linked)</p>
+              <p
+                className={`text-xl font-bold ${
+                  totalMatchKwh > 0 ? "text-red-600" : totalMatchKwh < 0 ? "text-green-600" : "text-slate-800"
+                }`}
+              >
+                {totalMatchKwh.toLocaleString(undefined, { maximumFractionDigits: 1 })} kWh
               </p>
-              {totalMonitorKwh !== totalLinkedKwh && (
-                <p className="text-xs text-amber-600">
-                  kWh: {(totalMonitorKwh - totalLinkedKwh).toLocaleString()}
-                </p>
-              )}
             </div>
           </div>
 
-          <MonitorsTable rows={rows} />
+          <MonitorsTable rows={rows} monthKwhPrice={monthKwhPrice} />
         </>
       )}
     </div>

@@ -54,11 +54,13 @@ export default async function ManagerDashboardPage({
   const allMonths = new Set([...billMonths, currentKey, previousKey]);
   const months = Array.from(allMonths).sort().reverse();
 
-  const freeCustomerIds = new Set(
-    customers.filter((c) => c.billingType === "FREE").map((c) => c.customerId)
-  );
   const monitorCustomerIds = new Set(
     customers.filter((c) => c.isMonitor).map((c) => c.customerId)
+  );
+  const freeCustomerIds = new Set(
+    customers
+      .filter((c) => c.billingType === "FREE" && !monitorCustomerIds.has(c.customerId))
+      .map((c) => c.customerId)
   );
   const excludedFromBillingIds = new Set([
     ...Array.from(freeCustomerIds),
@@ -83,23 +85,54 @@ export default async function ManagerDashboardPage({
   const freeBillsThisMonth = monthBills.filter((b) => freeCustomerIds.has(b.customerId));
   const monitorBillsThisMonth = monthBills.filter((b) => monitorCustomerIds.has(b.customerId));
   const customerMap = new Map(customers.map((c) => [c.customerId, c]));
-  const ampereExpectedInclFree =
-    totalAmpereBilled +
-    freeBillsThisMonth.reduce((s, b) => {
-      const cust = customerMap.get(b.customerId);
-      if (!cust) return s;
-      return s + getAmperePriceForTier(cust.subscribedAmpere, ampereTiers);
-    }, 0);
+  const freeAmpereExpected = freeBillsThisMonth.reduce((s, b) => {
+    const cust = customerMap.get(b.customerId);
+    if (!cust) return s;
+    return s + getAmperePriceForTier(cust.subscribedAmpere, ampereTiers);
+  }, 0);
   const totalConsumptionBilled = payingBills.reduce(
     (s, b) => s + b.consumptionCharge,
     0
   );
+  const totalFixedMonthlyBilled = payingBills.reduce((s, b) => {
+    const cust = customerMap.get(b.customerId);
+    return cust?.billingType === "FIXED_MONTHLY" ? s + b.totalDue : s;
+  }, 0);
   const totalKwhPaying = payingBills.reduce((s, b) => s + b.usageKwh, 0);
-  const totalKwhInclFree = monthBills.reduce((s, b) => s + b.usageKwh, 0);
-  const totalKwhAllTime = bills.reduce((s, b) => s + b.usageKwh, 0);
+  const totalKwhFree = freeBillsThisMonth.reduce((s, b) => s + b.usageKwh, 0);
   const kwhPrice = monthKwhPrice || settings.kwhPrice || 0;
-  const consumptionExpectedInclFree =
-    kwhPrice > 0 ? Math.round(totalKwhInclFree * kwhPrice) : 0;
+  const freeConsumptionExpected = freeBillsThisMonth.reduce((s, b) => {
+    const consumption = kwhPrice > 0 ? Math.round(b.usageKwh * kwhPrice) : b.consumptionCharge;
+    return s + consumption;
+  }, 0);
+  const freeFixedMonthlyExpected = freeBillsThisMonth.reduce((s, b) => {
+    const cust = customerMap.get(b.customerId);
+    return cust?.billingType === "FIXED_MONTHLY" ? s + b.totalDue : s;
+  }, 0);
+  const billByCustomerThisMonth = new Map(monthBills.map((b) => [b.customerId, b]));
+  const monitorRows = customers.filter((c) => c.isMonitor);
+  const totalMonitorRedMatchKwh = monitorRows.reduce((sum, monitor) => {
+    const linkedIds = monitor.linkedCustomerIds?.length
+      ? monitor.linkedCustomerIds
+      : monitor.linkedCustomerId
+        ? [monitor.linkedCustomerId]
+        : [];
+    if (linkedIds.length === 0) return sum;
+    const monitorBill = billByCustomerThisMonth.get(monitor.customerId);
+    const firstLinkedBill = billByCustomerThisMonth.get(linkedIds[0]);
+    const monitorKwh = (monitorBill ?? firstLinkedBill)?.usageKwh ?? 0;
+    const linkedIncludedKwh = linkedIds.reduce((s, linkedId) => {
+      const linkedCustomer = customerMap.get(linkedId);
+      if (!linkedCustomer || linkedCustomer.billingType !== "FIXED_MONTHLY") return s;
+      if (kwhPrice <= 0) return s;
+      return s + (linkedCustomer.fixedMonthlyPrice || 0) / kwhPrice;
+    }, 0);
+    const matchKwh = monitorKwh - linkedIncludedKwh;
+    return sum + Math.max(0, matchKwh); // red (positive) only
+  }, 0);
+  const totalKwhFreeWithMonitorRed = totalKwhFree + totalMonitorRedMatchKwh;
+  const freeConsumptionExpectedWithMonitorRed =
+    freeConsumptionExpected + Math.round(totalMonitorRedMatchKwh * kwhPrice);
 
   const unpaidThisMonthList = payingBills.filter((b) => b.remainingDue > 0);
   const unpaidByPreviousMonth = previousPayingBills.reduce(
@@ -215,54 +248,60 @@ export default async function ManagerDashboardPage({
             </p>
           </div>
           <div>
+            <p className="text-sm text-slate-500">From Fixed Monthly (ma2touaa)</p>
+            <p className="text-xl font-bold text-slate-800">
+              {totalFixedMonthlyBilled.toLocaleString()} LBP
+            </p>
+          </div>
+          <div>
             <p className="text-sm text-slate-500">Total Billed</p>
             <p className="text-xl font-bold text-slate-800">
               {totalBilled.toLocaleString()} LBP
             </p>
           </div>
-          <div>
-            <p className="text-sm text-slate-500">Total kWh (all time)</p>
-            <p className="text-xl font-bold text-slate-800">
-              {totalKwhAllTime.toLocaleString(undefined, { maximumFractionDigits: 0 })} kWh
-            </p>
-          </div>
         </div>
       </div>
 
-      {/* Revenue breakdown: If free charged */}
+      {/* Revenue breakdown: Free customers only (hypothetical if charged) */}
       <div className="bg-white rounded-lg border border-slate-200 p-6 mb-8">
         <h2 className="font-semibold text-slate-800 mb-4">
-          If Free Charged ({formatMonthKey(monthKey)}) — All customers
+          If Free Charged ({formatMonthKey(monthKey)}) — Free customers only
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
           <div>
             <p className="text-sm text-slate-500">kWh (this month)</p>
             <p className="text-xl font-bold text-slate-800">
-              {totalKwhInclFree.toLocaleString()} kWh
+              {totalKwhFreeWithMonitorRed.toLocaleString(undefined, {
+                maximumFractionDigits: 1,
+              })}{" "}
+              kWh
+            </p>
+            <p className="text-xs text-slate-500 mt-1">
+              Free kWh + monitor red match ({totalMonitorRedMatchKwh.toLocaleString(undefined, { maximumFractionDigits: 1 })} kWh)
             </p>
           </div>
           <div>
             <p className="text-sm text-slate-500">From Ampere</p>
             <p className="text-xl font-bold text-slate-800">
-              {ampereExpectedInclFree.toLocaleString()} LBP
+              {freeAmpereExpected.toLocaleString()} LBP
             </p>
           </div>
           <div>
             <p className="text-sm text-slate-500">From Consumption (kWh)</p>
             <p className="text-xl font-bold text-slate-800">
-              {consumptionExpectedInclFree.toLocaleString()} LBP
+              {freeConsumptionExpectedWithMonitorRed.toLocaleString()} LBP
+            </p>
+          </div>
+          <div>
+            <p className="text-sm text-slate-500">From Fixed Monthly (ma2touaa)</p>
+            <p className="text-xl font-bold text-slate-800">
+              {freeFixedMonthlyExpected.toLocaleString()} LBP
             </p>
           </div>
           <div>
             <p className="text-sm text-slate-500">Total (hypothetical)</p>
             <p className="text-xl font-bold text-slate-800">
-              {(ampereExpectedInclFree + consumptionExpectedInclFree).toLocaleString()} LBP
-            </p>
-          </div>
-          <div>
-            <p className="text-sm text-slate-500">Total kWh (all time)</p>
-            <p className="text-xl font-bold text-slate-800">
-              {totalKwhAllTime.toLocaleString(undefined, { maximumFractionDigits: 0 })} kWh
+              {(freeAmpereExpected + freeConsumptionExpectedWithMonitorRed + freeFixedMonthlyExpected).toLocaleString()} LBP
             </p>
           </div>
         </div>
