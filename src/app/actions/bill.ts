@@ -206,6 +206,29 @@ export async function deleteBillAction(input: { billId: string }) {
     await deletePaymentsByBillId(input.billId);
     await deleteBillById(input.billId);
 
+    // If a fixed-monthly bill is manually deleted, persist a month override to FREE
+    // so auto-billing does not recreate the same month on dashboard visits.
+    const monthProfile = await getBillingProfileForMonth(bill.customerId, bill.monthKey);
+    const shouldBlockRecreate =
+      bill.billingTypeSnapshot === "FIXED_MONTHLY" || monthProfile?.billingType === "FIXED_MONTHLY";
+    if (monthProfile && shouldBlockRecreate) {
+      const blockEntry: CustomerBillingHistory = {
+        entryId: `cbh_${bill.customerId}_${bill.monthKey}`,
+        customerId: bill.customerId,
+        monthKey: bill.monthKey,
+        billingType: "FREE",
+        subscribedAmpere: monthProfile.subscribedAmpere,
+        fixedMonthlyPrice: 0,
+        fixedDiscountAmount: monthProfile.fixedDiscountAmount,
+        fixedDiscountPercent: monthProfile.fixedDiscountPercent,
+        isMonitor: monthProfile.isMonitor,
+        reason: "Auto-set to FREE after manual bill delete",
+        updatedByRole: "manager",
+        updatedAt: new Date().toISOString(),
+      };
+      await upsertBillingHistoryEntry(blockEntry);
+    }
+
     revalidatePath("/employee");
     revalidatePath("/manager");
     revalidatePath("/manager/bills");
