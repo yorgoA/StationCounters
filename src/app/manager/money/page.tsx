@@ -13,6 +13,7 @@ import {
 import type { BillingType } from "@/types";
 import MoneyMonthSelect from "./MoneyMonthSelect";
 import MoneyUsdRateForm from "./MoneyUsdRateForm";
+import UnpaidCustomersDownloadButton from "./UnpaidCustomersDownloadButton";
 
 function getCurrentMonthKey() {
   const now = new Date();
@@ -260,7 +261,12 @@ export default async function ManagerMoneyPage({
       </div>
 
       <div className="bg-white rounded-lg border border-slate-200 p-6 mt-8">
-        <h2 className="font-semibold text-slate-800 mb-4">Unpaid customers</h2>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="font-semibold text-slate-800">Unpaid customers</h2>
+          {unpaidRows.length > 0 ? (
+            <UnpaidCustomersDownloadButton monthKey={monthKey} rows={unpaidRows} />
+          ) : null}
+        </div>
         {unpaidRows.length === 0 ? (
           <p className="text-slate-500">No unpaid bills this month.</p>
         ) : (
