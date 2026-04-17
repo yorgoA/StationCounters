@@ -2,13 +2,15 @@ import { calcBillFromReadings } from "@/lib/billing";
 import {
   createBill,
   getAllBills,
+  getBillingHistoryByCustomer,
   getAllCustomers,
   getAmperePrices,
   getBillingProfileForMonth,
   getKwhPriceForMonth,
+  upsertBillingHistoryEntry,
 } from "@/lib/google-sheets";
 import { generateId } from "@/lib/id";
-import type { Bill, Customer } from "@/types";
+import type { Bill, Customer, CustomerBillingHistory } from "@/types";
 
 type EnsureResult = { created: number };
 
@@ -111,6 +113,24 @@ export async function ensureFixedMonthlyBillsForMonth(monthKey: string): Promise
       };
 
       await createBill(bill);
+      const history = await getBillingHistoryByCustomer(customer.customerId);
+      if (!history.some((h) => h.monthKey === monthKey)) {
+        const snapshotEntry: CustomerBillingHistory = {
+          entryId: `cbh_${customer.customerId}_${monthKey}`,
+          customerId: customer.customerId,
+          monthKey,
+          billingType: profile.billingType,
+          subscribedAmpere: profile.subscribedAmpere,
+          fixedMonthlyPrice: profile.fixedMonthlyPrice,
+          fixedDiscountAmount: profile.fixedDiscountAmount,
+          fixedDiscountPercent: profile.fixedDiscountPercent,
+          isMonitor: profile.isMonitor,
+          reason: "Auto-snapshot at bill creation",
+          updatedByRole: "manager",
+          updatedAt: new Date().toISOString(),
+        };
+        await upsertBillingHistoryEntry(snapshotEntry);
+      }
       created++;
       existingForMonth.add(customer.customerId);
       bills.push(bill);

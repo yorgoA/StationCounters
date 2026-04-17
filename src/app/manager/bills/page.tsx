@@ -17,8 +17,10 @@ export default async function ManagerBillsPage({
   const params = await searchParams;
   const monthKey = params.month || getCurrentMonthKey();
   const statusParam = String(params.status || "").toLowerCase();
-  const statusFilter: "all" | "paid" | "unpaid" =
-    statusParam === "paid" || statusParam === "unpaid" ? statusParam : "all";
+  const statusFilter: "all" | "paid" | "partial" | "unpaid" =
+    statusParam === "paid" || statusParam === "partial" || statusParam === "unpaid"
+      ? statusParam
+      : "all";
   await ensureFixedMonthlyBillsForMonth(monthKey);
   const [bills, customers] = await Promise.all([getAllBills(), getAllCustomers()]);
 
@@ -29,7 +31,8 @@ export default async function ManagerBillsPage({
     .filter((b) => b.monthKey === monthKey)
     .filter((b) => {
       if (statusFilter === "paid") return b.paymentStatus === "PAID";
-      if (statusFilter === "unpaid") return b.remainingDue > 0;
+      if (statusFilter === "partial") return b.paymentStatus === "PARTIAL";
+      if (statusFilter === "unpaid") return b.paymentStatus === "UNPAID";
       return true;
     });
 

@@ -46,7 +46,20 @@ export default function BillingHistoryWithEdit({
           ) : (
             <div className="space-y-2">
               <div className="min-w-0 space-y-2">
-                <p className="text-slate-800 font-semibold">{b.monthKey}</p>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-slate-800 font-semibold">{b.monthKey}</p>
+                  <span
+                    className={`inline-flex rounded px-2 py-0.5 text-xs font-semibold ${
+                      b.paymentStatus === "PAID"
+                        ? "bg-green-100 text-green-800"
+                        : b.paymentStatus === "PARTIAL"
+                        ? "bg-amber-100 text-amber-800"
+                        : "bg-rose-100 text-rose-800"
+                    }`}
+                  >
+                    {b.paymentStatus}
+                  </span>
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-slate-600">
                   <p className="break-words">Type: {b.billingTypeSnapshot || "—"}</p>
                   <p className="break-words">Due: {b.totalDue.toLocaleString()}</p>
@@ -55,7 +68,10 @@ export default function BillingHistoryWithEdit({
                     Carry-in: {b.previousUnpaidBalance.toLocaleString()}
                   </p>
                 </div>
-                <p className="text-slate-600">
+                <p className="text-xs text-slate-500">
+                  Paid {b.totalPaid.toLocaleString()} / {b.totalDue.toLocaleString()}
+                </p>
+                <p className="text-slate-600 font-medium">
                   {b.remainingDue > 0 ? (
                     <span className="text-amber-600">{b.remainingDue.toLocaleString()} due</span>
                   ) : (

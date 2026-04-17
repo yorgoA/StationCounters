@@ -1,0 +1,8 @@
+{
+  "allow": [
+    { "sheet": "Bills", "keyPrefix": "bill_", "column": "updatedAt", "kind": "cell_updated" },
+    { "sheet": "Bills", "key": "bill_example123", "kind": "cell_updated" },
+    { "sheet": "Payments", "kind": "row_added" },
+    { "sheet": "BillingChangeLog", "kind": "row_added" }
+  ]
+}

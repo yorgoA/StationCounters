@@ -9,11 +9,11 @@ export default function BillsMonthSelect({
 }: {
   months: string[];
   currentMonth: string;
-  currentStatus: "all" | "paid" | "unpaid";
+  currentStatus: "all" | "paid" | "partial" | "unpaid";
 }) {
   const router = useRouter();
 
-  const buildUrl = (month: string, status: "all" | "paid" | "unpaid") => {
+  const buildUrl = (month: string, status: "all" | "paid" | "partial" | "unpaid") => {
     const qs = new URLSearchParams();
     qs.set("month", month);
     if (status !== "all") {
@@ -46,13 +46,14 @@ export default function BillsMonthSelect({
           value={currentStatus}
           onChange={(e) =>
             router.push(
-              buildUrl(currentMonth, e.target.value as "all" | "paid" | "unpaid")
+              buildUrl(currentMonth, e.target.value as "all" | "paid" | "partial" | "unpaid")
             )
           }
           className="input w-full max-w-xs"
         >
           <option value="all">All</option>
           <option value="paid">Paid</option>
+          <option value="partial">Partial</option>
           <option value="unpaid">Unpaid</option>
         </select>
       </div>

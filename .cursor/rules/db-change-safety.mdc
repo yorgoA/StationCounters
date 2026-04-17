@@ -1,0 +1,28 @@
+---
+description: Guard every DB change with snapshot + verification
+alwaysApply: true
+---
+
+# DB Change Safety Rule
+
+Before any direct DB/Google Sheets mutation, always run a snapshot-verify flow:
+
+1. Take a **before** snapshot.
+2. Apply the intended DB change.
+3. Take an **after** snapshot.
+4. Diff both snapshots and confirm only intended rows/fields changed.
+5. If verification passes, delete the **before** snapshot.
+6. If verification fails, stop and report unexpected changes before continuing.
+
+## Required Behavior
+
+- Never run blind DB writes without pre/post verification.
+- Prefer using `scripts/db-change-guard.mjs` with an allowlist file.
+- Treat any unexpected row/cell change as a blocker.
+- When uncertain, use stricter allowlists (specific sheet + row key + column).
+
+## Allowlist Policy
+
+- Minimal scope: only permit changes needed for this task.
+- Allow metadata columns (`updatedAt`, logs) only when expected.
+- Avoid broad sheet-wide allows unless user explicitly approves.

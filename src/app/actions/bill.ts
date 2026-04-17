@@ -45,6 +45,20 @@ function getPreviousUnpaidBalance(bills: Bill[], monthKey: string): number {
   return unpaid[0]?.remainingDue ?? 0;
 }
 
+function getBillBaseDue(bill: Bill): number {
+  if (bill.billingTypeSnapshot === "FREE") return 0;
+
+  if (bill.billingTypeSnapshot === "FIXED_MONTHLY" && (bill.fixedMonthlyPriceSnapshot ?? 0) > 0) {
+    return bill.fixedMonthlyPriceSnapshot ?? 0;
+  }
+
+  const meteredBase = bill.ampereCharge + bill.consumptionCharge - bill.discountApplied;
+  if (meteredBase > 0) return meteredBase;
+
+  // Legacy rows may lack snapshots; preserve their original non-carry component.
+  return Math.max(0, bill.totalDue - bill.previousUnpaidBalance);
+}
+
 export async function createBillAction(input: CreateBillInput) {
   const session = await getSession();
   if (!session.isLoggedIn) {
@@ -98,6 +112,24 @@ export async function createBillAction(input: CreateBillInput) {
 
   try {
     await dbCreateBill(bill);
+    const history = await getBillingHistoryByCustomer(input.customerId);
+    if (!history.some((h) => h.monthKey === input.monthKey)) {
+      const snapshotEntry: CustomerBillingHistory = {
+        entryId: `cbh_${input.customerId}_${input.monthKey}`,
+        customerId: input.customerId,
+        monthKey: input.monthKey,
+        billingType: profile.billingType,
+        subscribedAmpere: profile.subscribedAmpere,
+        fixedMonthlyPrice: profile.fixedMonthlyPrice,
+        fixedDiscountAmount: profile.fixedDiscountAmount,
+        fixedDiscountPercent: profile.fixedDiscountPercent,
+        isMonitor: profile.isMonitor,
+        reason: "Auto-snapshot at bill creation",
+        updatedByRole: session.role,
+        updatedAt: new Date().toISOString(),
+      };
+      await upsertBillingHistoryEntry(snapshotEntry);
+    }
     revalidatePath("/employee");
     revalidatePath("/manager");
     revalidatePath("/employee/readings");
@@ -516,56 +548,84 @@ async function recalculateCustomerBillsFromMonth(
   customerId: string,
   fromMonthKey: string
 ): Promise<void> {
-  const bills = (await getBillsByCustomer(customerId))
-    .filter((b) => b.monthKey >= fromMonthKey)
-    .sort((a, b) => a.monthKey.localeCompare(b.monthKey));
+  const [allBillsRaw, monthHistory, ampereTiers] = await Promise.all([
+    getBillsByCustomer(customerId),
+    getBillingHistoryByCustomer(customerId),
+    getAmperePrices(),
+  ]);
+  const allBills = [...allBillsRaw].sort((a, b) => a.monthKey.localeCompare(b.monthKey));
+  const bills = allBills.filter((b) => b.monthKey >= fromMonthKey);
+  const historyByMonth = new Map(monthHistory.map((h) => [h.monthKey, h]));
+  const kwhByMonth = new Map<string, number>();
 
   for (const bill of bills) {
-    const [profile, kwhPrice, ampereTiers, allBills] = await Promise.all([
-      getBillingProfileForMonth(bill.customerId, bill.monthKey),
-      getKwhPriceForMonth(bill.monthKey),
-      getAmperePrices(),
-      getBillsByCustomer(bill.customerId),
-    ]);
-    if (!profile) continue;
     const previousUnpaid = getPreviousUnpaidBalance(
       allBills.filter((b) => b.billId !== bill.billId),
       bill.monthKey
     );
-    const effectiveBillingType = profile.isMonitor ? "FREE" : profile.billingType;
-    const calc = calcBillFromReadings(
-      bill.customerId,
-      bill.monthKey,
-      bill.previousCounter,
-      bill.currentCounter,
-      profile.subscribedAmpere,
-      effectiveBillingType,
-      profile.fixedMonthlyPrice ?? 0,
-      profile.fixedDiscountAmount ?? 0,
-      profile.fixedDiscountPercent ?? 0,
-      ampereTiers,
-      kwhPrice,
-      previousUnpaid
-    );
-    const newRemainingDue = Math.max(0, calc.totalDue - bill.totalPaid);
-    const newPaymentStatus = calcPaymentStatus(bill.totalPaid, newRemainingDue);
-    const updated: Bill = {
-      ...bill,
-      usageKwh: calc.usageKwh,
-      amperePriceSnapshot: calc.amperePriceSnapshot,
-      kwhPriceSnapshot: calc.kwhPriceSnapshot,
-      ampereCharge: calc.ampereCharge,
-      consumptionCharge: calc.consumptionCharge,
-      discountApplied: calc.discountApplied,
-      previousUnpaidBalance: calc.previousUnpaidBalance,
-      totalDue: calc.totalDue,
-      remainingDue: newRemainingDue,
-      paymentStatus: newPaymentStatus,
-      billingTypeSnapshot: effectiveBillingType,
-      subscribedAmpereSnapshot: profile.subscribedAmpere,
-      fixedMonthlyPriceSnapshot: profile.fixedMonthlyPrice,
-      updatedAt: new Date().toISOString(),
-    };
+    const explicitMonthProfile = historyByMonth.get(bill.monthKey);
+    let updated: Bill;
+
+    if (explicitMonthProfile) {
+      const effectiveBillingType = explicitMonthProfile.isMonitor
+        ? "FREE"
+        : explicitMonthProfile.billingType;
+      let kwhPrice = kwhByMonth.get(bill.monthKey);
+      if (typeof kwhPrice !== "number") {
+        kwhPrice = await getKwhPriceForMonth(bill.monthKey);
+        kwhByMonth.set(bill.monthKey, kwhPrice);
+      }
+      const calc = calcBillFromReadings(
+        bill.customerId,
+        bill.monthKey,
+        bill.previousCounter,
+        bill.currentCounter,
+        explicitMonthProfile.subscribedAmpere,
+        effectiveBillingType,
+        explicitMonthProfile.fixedMonthlyPrice ?? 0,
+        explicitMonthProfile.fixedDiscountAmount ?? 0,
+        explicitMonthProfile.fixedDiscountPercent ?? 0,
+        ampereTiers,
+        kwhPrice,
+        previousUnpaid
+      );
+      const newRemainingDue = Math.max(0, calc.totalDue - bill.totalPaid);
+      const newPaymentStatus = calcPaymentStatus(bill.totalPaid, newRemainingDue);
+      updated = {
+        ...bill,
+        usageKwh: calc.usageKwh,
+        amperePriceSnapshot: calc.amperePriceSnapshot,
+        kwhPriceSnapshot: calc.kwhPriceSnapshot,
+        ampereCharge: calc.ampereCharge,
+        consumptionCharge: calc.consumptionCharge,
+        discountApplied: calc.discountApplied,
+        previousUnpaidBalance: calc.previousUnpaidBalance,
+        totalDue: calc.totalDue,
+        remainingDue: newRemainingDue,
+        paymentStatus: newPaymentStatus,
+        billingTypeSnapshot: effectiveBillingType,
+        subscribedAmpereSnapshot: explicitMonthProfile.subscribedAmpere,
+        fixedMonthlyPriceSnapshot: explicitMonthProfile.fixedMonthlyPrice,
+        updatedAt: new Date().toISOString(),
+      };
+    } else {
+      // Keep month base charge frozen from existing bill snapshots when no explicit month override exists.
+      const baseDue = getBillBaseDue(bill);
+      const totalDue = bill.billingTypeSnapshot === "FREE" ? 0 : baseDue + previousUnpaid;
+      const newRemainingDue = Math.max(0, totalDue - bill.totalPaid);
+      const newPaymentStatus = calcPaymentStatus(bill.totalPaid, newRemainingDue);
+      updated = {
+        ...bill,
+        previousUnpaidBalance: previousUnpaid,
+        totalDue,
+        remainingDue: newRemainingDue,
+        paymentStatus: newPaymentStatus,
+        updatedAt: new Date().toISOString(),
+      };
+    }
+
     await dbUpdateBill(updated);
+    const idx = allBills.findIndex((b) => b.billId === bill.billId);
+    if (idx >= 0) allBills[idx] = updated;
   }
 }

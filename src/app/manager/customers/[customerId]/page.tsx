@@ -13,6 +13,7 @@ import {
 } from "@/lib/google-sheets";
 import BillingHistoryWithEdit from "./BillingHistoryWithEdit";
 import MonthlyBillingProfilePanel from "./MonthlyBillingProfilePanel";
+import RecordPaymentForm from "@/app/employee/customers/[customerId]/RecordPaymentForm";
 
 export default async function ManagerCustomerDetailPage({
   params,
@@ -32,6 +33,7 @@ export default async function ManagerCustomerDetailPage({
   if (!customer) notFound();
 
   const sortedBills = [...bills].sort((a, b) => b.monthKey.localeCompare(a.monthKey));
+  const unpaidBills = sortedBills.filter((b) => b.remainingDue > 0);
   const payments = allPayments.filter((p) => p.customerId === customerId);
   const billPayments = await getPaymentsByBillIds(sortedBills.map((b) => b.billId));
   const totalBilled = sortedBills.reduce((s, b) => s + b.totalDue, 0);
@@ -138,6 +140,11 @@ export default async function ManagerCustomerDetailPage({
           </div>
 
           <div className="bg-white rounded-lg border border-slate-200 p-6">
+            <h2 className="font-semibold text-slate-800 mb-4">Record Payment</h2>
+            <RecordPaymentForm customerId={customerId} bills={unpaidBills} />
+          </div>
+
+          <div className="bg-white rounded-lg border border-slate-200 p-6 mt-6">
             <h2 className="font-semibold text-slate-800 mb-4">Recent Payments</h2>
             <div className="space-y-2 max-h-48 overflow-y-auto">
               {payments.slice(0, 5).map((p) => (
