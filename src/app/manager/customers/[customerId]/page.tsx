@@ -87,6 +87,10 @@ export default async function ManagerCustomerDetailPage({
                 bills={sortedBills}
               />
             </div>
+            <div className="mt-4 rounded border border-slate-200 p-4">
+              <h3 className="font-semibold text-slate-800 mb-3">Record Payment</h3>
+              <RecordPaymentForm customerId={customerId} bills={unpaidBills} />
+            </div>
           </div>
         </div>
 
@@ -137,11 +141,6 @@ export default async function ManagerCustomerDetailPage({
               ))}
               {billingLogs.length === 0 && <p className="text-slate-500">No audit logs yet.</p>}
             </div>
-          </div>
-
-          <div className="bg-white rounded-lg border border-slate-200 p-6">
-            <h2 className="font-semibold text-slate-800 mb-4">Record Payment</h2>
-            <RecordPaymentForm customerId={customerId} bills={unpaidBills} />
           </div>
 
           <div className="bg-white rounded-lg border border-slate-200 p-6 mt-6">
