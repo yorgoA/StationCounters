@@ -12,17 +12,26 @@ function getCurrentMonthKey() {
 export default async function ManagerBillsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string }>;
+  searchParams: Promise<{ month?: string; status?: string }>;
 }) {
   const params = await searchParams;
   const monthKey = params.month || getCurrentMonthKey();
+  const statusParam = String(params.status || "").toLowerCase();
+  const statusFilter: "all" | "paid" | "unpaid" =
+    statusParam === "paid" || statusParam === "unpaid" ? statusParam : "all";
   await ensureFixedMonthlyBillsForMonth(monthKey);
   const [bills, customers] = await Promise.all([getAllBills(), getAllCustomers()]);
 
   const monitorCustomerIds = new Set(customers.filter((c) => c.isMonitor).map((c) => c.customerId));
   const payingBills = bills.filter((b) => !monitorCustomerIds.has(b.customerId));
 
-  const monthBills = payingBills.filter((b) => b.monthKey === monthKey);
+  const monthBills = payingBills
+    .filter((b) => b.monthKey === monthKey)
+    .filter((b) => {
+      if (statusFilter === "paid") return b.paymentStatus === "PAID";
+      if (statusFilter === "unpaid") return b.remainingDue > 0;
+      return true;
+    });
 
   const months = Array.from(new Set(payingBills.map((b) => b.monthKey))).sort().reverse();
   if (months.length === 0) months.push(monthKey);
@@ -31,8 +40,11 @@ export default async function ManagerBillsPage({
     <div>
       <h1 className="text-2xl font-bold text-slate-800 mb-6">Bills</h1>
       <div className="mb-4">
-        <label className="block text-sm font-medium text-slate-700 mb-1">Filter by month</label>
-        <BillsMonthSelect months={months} currentMonth={monthKey} />
+        <BillsMonthSelect
+          months={months}
+          currentMonth={monthKey}
+          currentStatus={statusFilter}
+        />
       </div>
       <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
         <table className="min-w-full divide-y divide-slate-200">
@@ -83,7 +95,9 @@ export default async function ManagerBillsPage({
           </tbody>
         </table>
         {monthBills.length === 0 && (
-          <p className="text-center text-slate-500 py-12">No bills for {monthKey}</p>
+          <p className="text-center text-slate-500 py-12">
+            No {statusFilter === "all" ? "" : `${statusFilter} `}bills for {monthKey}
+          </p>
         )}
       </div>
     </div>

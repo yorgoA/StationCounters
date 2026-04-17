@@ -6,6 +6,7 @@ import {
   createPayment as dbCreatePayment,
   getCustomerById,
   getAllBills,
+  getBillsByCustomer,
   updateBill as dbUpdateBill,
 } from "@/lib/google-sheets";
 import { generateId } from "@/lib/id";
@@ -17,6 +18,65 @@ import type { Bill, CreatePaymentInput, Payment } from "@/types";
 async function getBillByIdInternal(billId: string): Promise<Bill | null> {
   const bills = await getAllBills();
   return bills.find((b) => b.billId === billId) ?? null;
+}
+
+function getPreviousUnpaidBalance(bills: Bill[], monthKey: string): number {
+  const unpaid = bills
+    .filter(
+      (b) =>
+        (b.paymentStatus === "UNPAID" || b.paymentStatus === "PARTIAL") &&
+        b.monthKey < monthKey
+    )
+    .sort((a, b) => b.monthKey.localeCompare(a.monthKey));
+  return unpaid[0]?.remainingDue ?? 0;
+}
+
+async function recalculateCustomerBillsFromMonth(
+  customerId: string,
+  fromMonthKey: string
+): Promise<void> {
+  const allBills = (await getBillsByCustomer(customerId)).sort((a, b) =>
+    a.monthKey.localeCompare(b.monthKey)
+  );
+  const targetBills = allBills.filter((b) => b.monthKey >= fromMonthKey);
+
+  for (const bill of targetBills) {
+    const previousUnpaid = getPreviousUnpaidBalance(
+      allBills.filter((b) => b.billId !== bill.billId),
+      bill.monthKey
+    );
+    const baseDue = getBillBaseDue(bill);
+    const totalDue = bill.billingTypeSnapshot === "FREE" ? 0 : baseDue + previousUnpaid;
+    const newRemainingDue = Math.max(0, totalDue - bill.totalPaid);
+    const newPaymentStatus = calcPaymentStatus(bill.totalPaid, newRemainingDue);
+    const updated: Bill = {
+      ...bill,
+      previousUnpaidBalance: previousUnpaid,
+      totalDue,
+      remainingDue: newRemainingDue,
+      paymentStatus: newPaymentStatus,
+      updatedAt: new Date().toISOString(),
+    };
+    await dbUpdateBill(updated);
+    const idx = allBills.findIndex((b) => b.billId === bill.billId);
+    if (idx >= 0) allBills[idx] = updated;
+  }
+}
+
+function getBillBaseDue(bill: Bill): number {
+  if (bill.billingTypeSnapshot === "FREE") return 0;
+
+  if (bill.billingTypeSnapshot === "FIXED_MONTHLY") {
+    if ((bill.fixedMonthlyPriceSnapshot ?? 0) > 0) {
+      return bill.fixedMonthlyPriceSnapshot ?? 0;
+    }
+  }
+
+  const meteredBase = bill.ampereCharge + bill.consumptionCharge - bill.discountApplied;
+  if (meteredBase > 0) return meteredBase;
+
+  // Legacy rows may not have snapshot/type fields; preserve their original base component.
+  return Math.max(0, bill.totalDue - bill.previousUnpaidBalance);
 }
 
 async function persistPayment(input: CreatePaymentInput & { receiptImageUrl: string }) {
@@ -53,6 +113,8 @@ async function persistPayment(input: CreatePaymentInput & { receiptImageUrl: str
   try {
     await dbCreatePayment(payment);
     await dbUpdateBill(updatedBill);
+    // Payment on an earlier month changes carry-in for later months.
+    await recalculateCustomerBillsFromMonth(input.customerId, bill.monthKey);
     revalidatePath("/employee");
     revalidatePath("/manager");
     revalidatePath("/employee/payments");
