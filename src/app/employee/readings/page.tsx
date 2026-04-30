@@ -1,6 +1,8 @@
 export const dynamic = "force-dynamic";
 
 import { getAllBills, getAllCustomers } from "@/lib/google-sheets";
+import { customerMatchesRegion, parseRegionFilter } from "@/lib/region";
+import ManagerRegionSelect from "@/app/manager/ManagerRegionSelect";
 import ReadingsByBox from "./ReadingsByBox";
 import EmployeeReadingsMonthSelect from "./EmployeeReadingsMonthSelect";
 
@@ -19,11 +21,14 @@ function monthKeyFromDate(iso: string | undefined): string | null {
 export default async function EmployeeReadingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string }>;
+  searchParams: Promise<{ month?: string; region?: string }>;
 }) {
   const params = await searchParams;
+  const regionFilter = parseRegionFilter(params.region);
   const [customers, bills] = await Promise.all([getAllCustomers(), getAllBills()]);
-  const activeCustomers = customers.filter((c) => c.status === "ACTIVE");
+  const activeCustomers = customers.filter(
+    (c) => c.status === "ACTIVE" && customerMatchesRegion(c, regionFilter)
+  );
   const billMonths = Array.from(new Set(bills.map((b) => b.monthKey)));
   const currentMonth = getCurrentMonthKey();
   const months = Array.from(new Set([...billMonths, currentMonth])).sort().reverse();
@@ -51,12 +56,18 @@ export default async function EmployeeReadingsPage({
             for that month are hidden.
           </p>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-600 mb-1">Month</label>
-          <EmployeeReadingsMonthSelect months={months} currentMonth={monthKey} />
+        <div className="flex items-end gap-3">
+          <div>
+            <label className="block text-sm font-medium text-slate-600 mb-1">Month</label>
+            <EmployeeReadingsMonthSelect months={months} currentMonth={monthKey} region={regionFilter} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-600 mb-1">Region</label>
+            <ManagerRegionSelect basePath="/employee/readings" month={monthKey} currentRegion={regionFilter} />
+          </div>
         </div>
       </div>
-      <ReadingsByBox customers={pendingCustomers} monthKey={monthKey} />
+      <ReadingsByBox customers={pendingCustomers} monthKey={monthKey} region={regionFilter} />
     </div>
   );
 }

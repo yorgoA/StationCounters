@@ -11,16 +11,18 @@ function formatMonthKey(monthKey: string) {
 export default function EmployeeReadingsMonthSelect({
   months,
   currentMonth,
+  region = "ALL",
 }: {
   months: string[];
   currentMonth: string;
+  region?: string;
 }) {
   const router = useRouter();
   return (
     <select
       value={currentMonth}
       onChange={(e) => {
-        router.push(`/employee/readings?month=${e.target.value}`);
+        router.push(`/employee/readings?month=${e.target.value}&region=${region}`);
         router.refresh();
       }}
       className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"

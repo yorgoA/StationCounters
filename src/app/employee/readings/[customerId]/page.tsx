@@ -10,11 +10,12 @@ export default async function EmployeeRecordReadingPage({
   searchParams,
 }: {
   params: Promise<{ customerId: string }>;
-  searchParams: Promise<{ month?: string }>;
+  searchParams: Promise<{ month?: string; region?: string }>;
 }) {
   const { customerId } = await params;
   const sp = await searchParams;
   const selectedMonth = sp.month;
+  const selectedRegion = sp.region;
   const [customer, bills] = await Promise.all([
     getCustomerById(customerId),
     getBillsByCustomer(customerId),
@@ -29,7 +30,7 @@ export default async function EmployeeRecordReadingPage({
     <div>
       <div className="mb-6">
         <Link
-          href={selectedMonth ? `/employee/readings?month=${selectedMonth}` : "/employee/readings"}
+          href={selectedMonth ? `/employee/readings?month=${selectedMonth}${selectedRegion ? `&region=${selectedRegion}` : ""}` : `/employee/readings${selectedRegion ? `?region=${selectedRegion}` : ""}`}
           className="text-primary-600 hover:text-primary-700 text-sm"
         >
           ← Back to Record Reading

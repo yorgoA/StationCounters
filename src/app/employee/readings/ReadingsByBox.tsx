@@ -7,10 +7,12 @@ import type { Customer } from "@/types";
 export default function ReadingsByBox({
   customers,
   monthKey,
+  region = "ALL",
   readingsLinkPath = "/employee/readings",
 }: {
   customers: Customer[];
   monthKey: string;
+  region?: string;
   readingsLinkPath?: string;
 }) {
   const [boxFilter, setBoxFilter] = useState("");
@@ -95,7 +97,7 @@ export default function ReadingsByBox({
                 <td className="px-4 py-3 text-slate-600">{c.area || "—"}</td>
                 <td className="px-4 py-3 text-right">
                   <Link
-                    href={`${readingsLinkPath}/${c.customerId}?month=${monthKey}`}
+                    href={`${readingsLinkPath}/${c.customerId}?month=${monthKey}&region=${region}`}
                     className="text-primary-600 hover:text-primary-700 text-sm font-medium"
                   >
                     Record Reading →

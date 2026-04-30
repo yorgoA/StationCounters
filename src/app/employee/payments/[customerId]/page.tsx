@@ -7,10 +7,14 @@ import RecordPaymentForm from "../../customers/[customerId]/RecordPaymentForm";
 
 export default async function EmployeeRecordPaymentPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ customerId: string }>;
+  searchParams: Promise<{ region?: string }>;
 }) {
   const { customerId } = await params;
+  const query = await searchParams;
+  const region = query.region;
   const [customer, bills] = await Promise.all([
     getCustomerById(customerId),
     getBillsByCustomer(customerId),
@@ -23,7 +27,7 @@ export default async function EmployeeRecordPaymentPage({
   return (
     <div>
       <div className="mb-6">
-        <Link href="/employee/payments" className="text-primary-600 hover:text-primary-700 text-sm">
+        <Link href={region ? `/employee/payments?region=${region}` : "/employee/payments"} className="text-primary-600 hover:text-primary-700 text-sm">
           ← Back to Record Payment
         </Link>
       </div>

@@ -8,10 +8,12 @@ export default function UnpaidBillsTable({
   unpaidBills,
   customers,
   activeCustomerIds,
+  region = "ALL",
 }: {
   unpaidBills: Bill[];
   customers: Customer[];
   activeCustomerIds: Set<string>;
+  region?: string;
 }) {
   const [q, setQ] = useState("");
 
@@ -75,7 +77,7 @@ export default function UnpaidBillsTable({
                   </td>
                   <td className="px-4 py-3 text-right">
                     <Link
-                      href={`/employee/payments/${b.customerId}`}
+                      href={`/employee/payments/${b.customerId}?region=${region}`}
                       className="text-primary-600 hover:text-primary-700 text-sm font-medium"
                     >
                       Record Payment →
