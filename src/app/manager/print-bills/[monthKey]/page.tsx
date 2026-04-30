@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { getAllBills, getAllCustomers } from "@/lib/google-sheets";
+import { customerMatchesRegion, formatRegion, parseRegionFilter } from "@/lib/region";
 import { notFound } from "next/navigation";
 import PrintMonthlyBillsButton from "./PrintMonthlyBillsButton";
 
@@ -99,10 +100,14 @@ function BillCard({
 
 export default async function PrintMonthlyBillsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ monthKey: string }>;
+  searchParams: Promise<{ region?: string }>;
 }) {
   const { monthKey } = await params;
+  const query = await searchParams;
+  const regionFilter = parseRegionFilter(query.region);
   if (!/^\d{4}-\d{2}$/.test(monthKey)) notFound();
 
   const [bills, customers] = await Promise.all([
@@ -110,18 +115,20 @@ export default async function PrintMonthlyBillsPage({
     getAllCustomers(),
   ]);
 
-  const monitorCustomerIds = new Set(customers.filter((c) => c.isMonitor).map((c) => c.customerId));
+  const filteredCustomers = customers.filter((c) => customerMatchesRegion(c, regionFilter));
+  const allowedCustomerIds = new Set(filteredCustomers.map((c) => c.customerId));
+  const monitorCustomerIds = new Set(filteredCustomers.filter((c) => c.isMonitor).map((c) => c.customerId));
   const monthBills = bills
-    .filter((b) => b.monthKey === monthKey && !monitorCustomerIds.has(b.customerId))
+    .filter((b) => b.monthKey === monthKey && allowedCustomerIds.has(b.customerId) && !monitorCustomerIds.has(b.customerId))
     .sort((a, b) => {
-      const custA = customers.find((c) => c.customerId === a.customerId);
-      const custB = customers.find((c) => c.customerId === b.customerId);
+      const custA = filteredCustomers.find((c) => c.customerId === a.customerId);
+      const custB = filteredCustomers.find((c) => c.customerId === b.customerId);
       const nameA = custA?.fullName ?? a.customerId;
       const nameB = custB?.fullName ?? b.customerId;
       return nameA.localeCompare(nameB);
     });
 
-  const customerMap = new Map(customers.map((c) => [c.customerId, c]));
+  const customerMap = new Map(filteredCustomers.map((c) => [c.customerId, c]));
   const monthLabel = formatMonthKey(monthKey);
 
   const pages: typeof monthBills[] = [];
@@ -132,13 +139,13 @@ export default async function PrintMonthlyBillsPage({
   return (
     <div className="print-monthly-bills">
       <div className="flex justify-between items-center mb-6 print:hidden">
-        <Link href="/manager/reports" className="text-primary-600 hover:text-primary-700 text-sm">
+        <Link href={`/manager/reports?region=${regionFilter}`} className="text-primary-600 hover:text-primary-700 text-sm">
           ← Back to Reports
         </Link>
         <PrintMonthlyBillsButton />
       </div>
       <p className="text-slate-500 text-sm mb-4 print:hidden">
-        {monthBills.length} bills • 2 per page • Print or Save as PDF, then cut and distribute.
+        {monthBills.length} bills • {formatRegion(regionFilter)} • 2 per page • Print or Save as PDF, then cut and distribute.
       </p>
 
       <div className="print-bills-pages space-y-8">

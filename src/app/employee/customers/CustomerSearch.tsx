@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { formatRegion, REGION_FILTER_OPTIONS, type RegionFilter } from "@/lib/region";
 import type { Customer } from "@/types";
 
 export default function CustomerSearch({
@@ -17,6 +18,7 @@ export default function CustomerSearch({
   const [freeOnly, setFreeOnly] = useState(false);
   const [boxFilter, setBoxFilter] = useState("");
   const [buildingFilter, setBuildingFilter] = useState("");
+  const [regionFilter, setRegionFilter] = useState<RegionFilter>("ALL");
 
   const uniqueBoxes = useMemo(() => {
     const set = new Set(initialCustomers.map((c) => c.area).filter(Boolean));
@@ -30,6 +32,7 @@ export default function CustomerSearch({
   const filtered = useMemo(() => {
     let list = initialCustomers;
     if (freeOnly) list = list.filter((c) => c.billingType === "FREE");
+    if (regionFilter !== "ALL") list = list.filter((c) => c.region === regionFilter);
     if (boxFilter) list = list.filter((c) => c.area === boxFilter);
     if (buildingFilter) list = list.filter((c) => c.building === buildingFilter);
     if (!q.trim()) return list;
@@ -41,7 +44,7 @@ export default function CustomerSearch({
         (c.area && c.area.toLowerCase().includes(lower)) ||
         (c.building && c.building.toLowerCase().includes(lower))
     );
-  }, [initialCustomers, q, freeOnly, boxFilter, buildingFilter]);
+  }, [initialCustomers, q, freeOnly, boxFilter, buildingFilter, regionFilter]);
 
   return (
     <>
@@ -61,6 +64,17 @@ export default function CustomerSearch({
           {uniqueBoxes.map((box) => (
             <option key={box} value={box}>
               Box {box}
+            </option>
+          ))}
+        </select>
+        <select
+          value={regionFilter}
+          onChange={(e) => setRegionFilter(e.target.value as RegionFilter)}
+          className="rounded-lg border border-slate-300 px-3 py-2 text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+        >
+          {REGION_FILTER_OPTIONS.map((r) => (
+            <option key={r} value={r}>
+              {formatRegion(r)}
             </option>
           ))}
         </select>
@@ -96,6 +110,7 @@ export default function CustomerSearch({
               <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Phone</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Box Number</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Building</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Region</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Status</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Billing</th>
               <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Actions</th>
@@ -108,6 +123,7 @@ export default function CustomerSearch({
                 <td className="px-4 py-3 text-slate-600">{c.phone}</td>
                 <td className="px-4 py-3 text-slate-600">{c.area}</td>
                 <td className="px-4 py-3 text-slate-600">{c.building}</td>
+                <td className="px-4 py-3 text-slate-600">{formatRegion(c.region)}</td>
                 <td className="px-4 py-3">
                   <span
                     className={`inline-flex px-2 py-0.5 text-xs font-medium rounded ${
@@ -148,7 +164,7 @@ export default function CustomerSearch({
         </table>
         {filtered.length === 0 && (
           <p className="text-center text-slate-500 py-12">
-            {q.trim() || boxFilter || buildingFilter || freeOnly
+            {q.trim() || boxFilter || buildingFilter || freeOnly || regionFilter !== "ALL"
               ? "No customers match your filters"
               : "No customers yet"}
           </p>

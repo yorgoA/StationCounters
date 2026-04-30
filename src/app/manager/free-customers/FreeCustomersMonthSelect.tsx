@@ -14,15 +14,17 @@ function formatMonthKey(monthKey: string) {
 export default function FreeCustomersMonthSelect({
   months,
   currentMonth,
+  region = "ALL",
 }: {
   months: string[];
   currentMonth: string;
+  region?: string;
 }) {
   const router = useRouter();
   return (
     <select
       value={currentMonth}
-      onChange={(e) => router.push(`/manager/free-customers?month=${e.target.value}`)}
+      onChange={(e) => router.push(`/manager/free-customers?month=${e.target.value}&region=${region}`)}
       className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
     >
       {months.map((m) => (

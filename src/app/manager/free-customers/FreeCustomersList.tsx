@@ -9,9 +9,11 @@ import type { Customer } from "@/types";
 export default function FreeCustomersList({
   customers,
   kwhByCustomerId,
+  region = "ALL",
 }: {
   customers: Customer[];
   kwhByCustomerId: Record<string, number>;
+  region?: string;
 }) {
   const router = useRouter();
   const [updating, setUpdating] = useState<string | null>(null);
@@ -121,7 +123,7 @@ export default function FreeCustomersList({
               </td>
               <td className="px-4 py-3">
                 <Link
-                  href={`/manager/free-customers/${c.customerId}`}
+                  href={`/manager/free-customers/${c.customerId}?region=${region}`}
                   className="font-medium text-slate-800 hover:text-primary-600"
                 >
                   {c.fullName}
@@ -161,7 +163,7 @@ export default function FreeCustomersList({
               </td>
               <td className="px-4 py-3 text-right">
                 <Link
-                  href={`/manager/free-customers/${c.customerId}`}
+                  href={`/manager/free-customers/${c.customerId}?region=${region}`}
                   className="text-primary-600 hover:text-primary-700 text-sm"
                 >
                   View

@@ -1,0 +1,9 @@
+{
+  "allow": [
+    {
+      "sheet": "Customers",
+      "column": "region",
+      "kind": "cell_updated"
+    }
+  ]
+}

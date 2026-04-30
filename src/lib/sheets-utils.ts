@@ -12,6 +12,7 @@ import type {
   Customer,
   MonthlyTariff,
   Payment,
+  Region,
   Settings,
 } from "@/types";
 
@@ -59,6 +60,7 @@ export function rowToCustomer(row: string[]): Customer {
     fixedDiscountAmount: parseFloat(r[9] || "0") || 0,
     fixedDiscountPercent: parseFloat(r[14] || "0") || 0,
     fixedMonthlyPrice: parseFloat(r[18] || "0") || 0,
+    region: normalizeRegion(r[19]),
     status: (r[10] || "ACTIVE") as Customer["status"],
     notes: r[11] || "",
     createdAt: r[12] || new Date().toISOString(),
@@ -68,6 +70,12 @@ export function rowToCustomer(row: string[]): Customer {
     linkedCustomerIds: parseLinkedCustomerIds(r[16]),
     monitorCategory: r[17]?.trim() || undefined,
   };
+}
+
+function normalizeRegion(raw: string | undefined): Region {
+  const val = String(raw || "").trim().toUpperCase();
+  if (val === "PRINTANIA") return "PRINTANIA";
+  return "MRAH_GHANEM";
 }
 
 function parseLinkedCustomerIds(val: string | undefined): string[] {
@@ -98,6 +106,7 @@ export function customerToRow(c: Customer): string[] {
       : (c.linkedCustomerId ?? ""),
     c.monitorCategory ?? "",
     String(c.fixedMonthlyPrice ?? 0),
+    c.region ?? "MRAH_GHANEM",
   ];
 }
 

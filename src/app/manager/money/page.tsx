@@ -11,6 +11,8 @@ import {
   getSettings,
 } from "@/lib/google-sheets";
 import type { BillingType } from "@/types";
+import { customerMatchesRegion, formatRegion, parseRegionFilter } from "@/lib/region";
+import ManagerRegionSelect from "../ManagerRegionSelect";
 import MoneyMonthSelect from "./MoneyMonthSelect";
 import MoneyUsdRateForm from "./MoneyUsdRateForm";
 import UnpaidCustomersDownloadButton from "./UnpaidCustomersDownloadButton";
@@ -69,10 +71,11 @@ function isExcludedFromCollection(
 export default async function ManagerMoneyPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string }>;
+  searchParams: Promise<{ month?: string; region?: string }>;
 }) {
   const params = await searchParams;
   const monthKey = params.month || getPreviousMonthKey();
+  const regionFilter = parseRegionFilter(params.region);
   await ensureFixedMonthlyBillsForMonth(monthKey);
 
   const [customers, bills, ampereTiers, monthKwhPrice, settings] = await Promise.all([
@@ -87,14 +90,16 @@ export default async function ManagerMoneyPage({
     new Set([...billMonths, getCurrentMonthKey(), getPreviousMonthKey()])
   ).sort().reverse();
 
-  const monitorIds = new Set(customers.filter((c) => c.isMonitor).map((c) => c.customerId));
-  const customerMap = new Map(customers.map((c) => [c.customerId, c]));
+  const filteredCustomers = customers.filter((c) => customerMatchesRegion(c, regionFilter));
+  const allowedCustomerIds = new Set(filteredCustomers.map((c) => c.customerId));
+  const customerMap = new Map(filteredCustomers.map((c) => [c.customerId, c]));
 
   const monthPayingBills = bills.filter(
-    (b) => b.monthKey === monthKey && !isExcludedFromCollection(b, customerMap.get(b.customerId))
+    (b) => b.monthKey === monthKey && allowedCustomerIds.has(b.customerId) && !isExcludedFromCollection(b, customerMap.get(b.customerId))
   );
   const previousPayingBills = bills.filter(
     (b) => {
+      if (!allowedCustomerIds.has(b.customerId)) return false;
       if (!isBeforeMonth(b.monthKey, monthKey)) return false;
       if (isExcludedFromCollection(b, customerMap.get(b.customerId))) return false;
       if (!(b.remainingDue > 0)) return false;
@@ -103,7 +108,7 @@ export default async function ManagerMoneyPage({
   );
   const effectiveKwhPrice = monthKwhPrice > 0 ? monthKwhPrice : settings.kwhPrice;
   const freeNonMonitorIds = new Set(
-    customers
+    filteredCustomers
       .filter((c) => c.billingType === "FREE" && !c.isMonitor)
       .map((c) => c.customerId)
   );
@@ -120,8 +125,8 @@ export default async function ManagerMoneyPage({
     0
   );
   const freeLostTotal = freeLostFromAmpere + freeLostFromConsumption;
-  const billByCustomer = new Map(bills.filter((b) => b.monthKey === monthKey).map((b) => [b.customerId, b]));
-  const monitorRows = customers.filter((c) => c.isMonitor);
+  const billByCustomer = new Map(bills.filter((b) => b.monthKey === monthKey && allowedCustomerIds.has(b.customerId)).map((b) => [b.customerId, b]));
+  const monitorRows = filteredCustomers.filter((c) => c.isMonitor);
   const monitorExcessKwh = monitorRows.reduce((sum, monitor) => {
     const links = monitor.linkedCustomerIds?.length
       ? monitor.linkedCustomerIds
@@ -176,13 +181,17 @@ export default async function ManagerMoneyPage({
       <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Money Dashboard</h1>
-          <p className="text-slate-500 mt-1">Financial view for {formatMonthKey(monthKey)}.</p>
+          <p className="text-slate-500 mt-1">Financial view for {formatMonthKey(monthKey)} - {formatRegion(regionFilter)}.</p>
         </div>
         <div className="flex flex-wrap items-end gap-4">
           <MoneyUsdRateForm initialUsdRate={usdRate} />
           <div>
             <label className="block text-sm font-medium text-slate-600 mb-1">Month</label>
-            <MoneyMonthSelect months={months} currentMonth={monthKey} />
+            <MoneyMonthSelect months={months} currentMonth={monthKey} region={regionFilter} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-600 mb-1">Region</label>
+            <ManagerRegionSelect basePath="/manager/money" month={monthKey} currentRegion={regionFilter} />
           </div>
         </div>
       </div>

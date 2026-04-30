@@ -1,6 +1,8 @@
 export const dynamic = "force-dynamic";
 
 import { getAllBills, getAllCustomers } from "@/lib/google-sheets";
+import { customerMatchesRegion, formatRegion, parseRegionFilter } from "@/lib/region";
+import ManagerRegionSelect from "../ManagerRegionSelect";
 import FreeCustomersList from "./FreeCustomersList";
 import FreeCustomersMonthSelect from "./FreeCustomersMonthSelect";
 
@@ -26,11 +28,13 @@ function formatMonthKey(monthKey: string) {
 export default async function ManagerFreeCustomersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string }>;
+  searchParams: Promise<{ month?: string; region?: string }>;
 }) {
   const params = await searchParams;
+  const regionFilter = parseRegionFilter(params.region);
   const [customers, bills] = await Promise.all([getAllCustomers(), getAllBills()]);
-  const freeCustomers = customers.filter((c) => c.billingType === "FREE" && !c.isMonitor);
+  const filteredCustomers = customers.filter((c) => customerMatchesRegion(c, regionFilter));
+  const freeCustomers = filteredCustomers.filter((c) => c.billingType === "FREE" && !c.isMonitor);
   const freeCustomerIds = new Set(freeCustomers.map((c) => c.customerId));
   const billMonths = Array.from(new Set(bills.map((b) => b.monthKey)));
   const currentKey = getCurrentMonthKey();
@@ -58,12 +62,18 @@ export default async function ManagerFreeCustomersPage({
           <h1 className="text-2xl font-bold text-slate-800">Free Customers</h1>
           <p className="text-slate-500 mt-1">
             Manage customers who are exempt from charges. Uncheck to remove from free list.
-            Add a reason for tracking.
+            Add a reason for tracking. Current filter: {formatRegion(regionFilter)}.
           </p>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-600 mb-1">Month</label>
-          <FreeCustomersMonthSelect months={months} currentMonth={monthKey} />
+        <div className="flex items-end gap-3">
+          <div>
+            <label className="block text-sm font-medium text-slate-600 mb-1">Month</label>
+            <FreeCustomersMonthSelect months={months} currentMonth={monthKey} region={regionFilter} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-600 mb-1">Region</label>
+            <ManagerRegionSelect basePath="/manager/free-customers" month={monthKey} currentRegion={regionFilter} />
+          </div>
         </div>
       </div>
 
@@ -76,7 +86,7 @@ export default async function ManagerFreeCustomersPage({
         </p>
       </div>
 
-      <FreeCustomersList customers={freeCustomers} kwhByCustomerId={kwhByCustomerId} />
+      <FreeCustomersList customers={freeCustomers} kwhByCustomerId={kwhByCustomerId} region={regionFilter} />
     </div>
   );
 }

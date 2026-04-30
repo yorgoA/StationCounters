@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createCustomerAction } from "@/app/actions/customer";
+import { formatRegion, REGION_OPTIONS } from "@/lib/region";
 import { MONITOR_CATEGORIES } from "@/types";
 import type { AmperePriceTier, BillingType, Customer } from "@/types";
 
@@ -57,6 +58,7 @@ export default function AddCustomerForm({
       fullName: data.get("fullName") as string,
       phone: data.get("phone") as string,
       area: data.get("boxNumber") as string,
+      region: (data.get("region") as Customer["region"]) || "MRAH_GHANEM",
       building: data.get("building") as string,
       floor: data.get("floor") as string,
       apartmentNumber: data.get("apartmentNumber") as string,
@@ -100,6 +102,16 @@ export default function AddCustomerForm({
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">Building *</label>
           <input name="building" required className="input" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Region *</label>
+          <select name="region" className="input" defaultValue="MRAH_GHANEM" required>
+            {REGION_OPTIONS.map((region) => (
+              <option key={region} value={region}>
+                {formatRegion(region)}
+              </option>
+            ))}
+          </select>
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">Floor</label>

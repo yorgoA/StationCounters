@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { getAllBills, getAllCustomers } from "@/lib/google-sheets";
+import { customerMatchesRegion, formatRegion, parseRegionFilter } from "@/lib/region";
 import { notFound } from "next/navigation";
 
 function formatMonthKey(monthKey: string) {
@@ -12,10 +13,14 @@ function formatMonthKey(monthKey: string) {
 
 export default async function UnpaidByMonthPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ monthKey: string }>;
+  searchParams: Promise<{ region?: string }>;
 }) {
   const { monthKey } = await params;
+  const query = await searchParams;
+  const regionFilter = parseRegionFilter(query.region);
   if (!/^\d{4}-\d{2}$/.test(monthKey)) notFound();
 
   const [bills, customers] = await Promise.all([
@@ -23,17 +28,19 @@ export default async function UnpaidByMonthPage({
     getAllCustomers(),
   ]);
 
-  const freeIds = new Set(customers.filter((c) => c.billingType === "FREE").map((c) => c.customerId));
-  const monitorIds = new Set(customers.filter((c) => c.isMonitor).map((c) => c.customerId));
+  const filteredCustomers = customers.filter((c) => customerMatchesRegion(c, regionFilter));
+  const allowedCustomerIds = new Set(filteredCustomers.map((c) => c.customerId));
+  const freeIds = new Set(filteredCustomers.filter((c) => c.billingType === "FREE").map((c) => c.customerId));
+  const monitorIds = new Set(filteredCustomers.filter((c) => c.isMonitor).map((c) => c.customerId));
   const excludedIds = new Set([
     ...Array.from(freeIds),
     ...Array.from(monitorIds),
   ]);
-  const monthBills = bills.filter((b) => b.monthKey === monthKey);
+  const monthBills = bills.filter((b) => b.monthKey === monthKey && allowedCustomerIds.has(b.customerId));
   const unpaidBills = monthBills.filter(
     (b) => b.remainingDue > 0 && !excludedIds.has(b.customerId)
   );
-  const customerMap = new Map(customers.map((c) => [c.customerId, c]));
+  const customerMap = new Map(filteredCustomers.map((c) => [c.customerId, c]));
 
   const totalUnpaid = unpaidBills.reduce((s, b) => s + b.remainingDue, 0);
 
@@ -42,7 +49,7 @@ export default async function UnpaidByMonthPage({
       <div className="mb-6 flex items-center justify-between">
         <div>
           <Link
-            href="/manager/reports"
+            href={`/manager/reports?region=${regionFilter}`}
             className="text-sm text-slate-500 hover:text-slate-700"
           >
             ← Back to Reports
@@ -52,7 +59,7 @@ export default async function UnpaidByMonthPage({
           </h1>
           <p className="mt-1 text-slate-500">
             {unpaidBills.length} customer{unpaidBills.length !== 1 ? "s" : ""}{" "}
-            with remaining balance • {totalUnpaid.toLocaleString()} LBP total
+            with remaining balance • {totalUnpaid.toLocaleString()} LBP total • {formatRegion(regionFilter)}
           </p>
         </div>
       </div>

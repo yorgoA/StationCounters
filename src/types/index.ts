@@ -15,12 +15,14 @@ export interface SessionUser {
 
 export type BillingType = "AMPERE_ONLY" | "KWH_ONLY" | "BOTH" | "FREE" | "FIXED_MONTHLY";
 export type CustomerStatus = "ACTIVE" | "INACTIVE";
+export type Region = "MRAH_GHANEM" | "PRINTANIA";
 
 export interface Customer {
   customerId: string;
   fullName: string;
   phone: string;
   area: string;
+  region: Region;
   building: string;
   floor: string;
   apartmentNumber: string;
@@ -46,6 +48,7 @@ export interface CreateCustomerInput {
   fullName: string;
   phone: string;
   area: string;
+  region?: Region;
   building: string;
   floor: string;
   apartmentNumber: string;

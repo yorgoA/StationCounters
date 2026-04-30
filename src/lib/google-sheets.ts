@@ -223,7 +223,7 @@ export async function createCustomer(customer: Customer): Promise<void> {
 }
 
 export async function updateCustomer(customer: Customer): Promise<void> {
-  const rows = await getRange(SHEET_NAMES.CUSTOMERS, "A:Q");
+  const rows = await getRange(SHEET_NAMES.CUSTOMERS, "A:T");
   const custId = String(customer.customerId || "").trim();
   const idx = rows.findIndex(
     (r, i) => i > 0 && String(r[0] ?? "").trim() === custId

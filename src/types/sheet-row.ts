@@ -8,6 +8,7 @@ export interface CustomerRow {
   fullName: string;
   phone: string;
   area: string;
+  region: string;
   building: string;
   floor: string;
   apartmentNumber: string;

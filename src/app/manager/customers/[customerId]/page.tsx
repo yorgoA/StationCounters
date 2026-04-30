@@ -10,10 +10,14 @@ import {
   getBillingHistoryByCustomer,
   getBillingChangeLogsByCustomer,
   getPaymentsByBillIds,
+  getAmperePrices,
+  getAllCustomers,
 } from "@/lib/google-sheets";
 import BillingHistoryWithEdit from "./BillingHistoryWithEdit";
 import MonthlyBillingProfilePanel from "./MonthlyBillingProfilePanel";
 import RecordPaymentForm from "@/app/employee/customers/[customerId]/RecordPaymentForm";
+import EditCustomerForm from "./EditCustomerForm";
+import { formatRegion } from "@/lib/region";
 
 export default async function ManagerCustomerDetailPage({
   params,
@@ -22,12 +26,14 @@ export default async function ManagerCustomerDetailPage({
 }) {
   unstable_noStore();
   const { customerId } = await params;
-  const [customer, bills, allPayments, billingHistory, billingLogs] = await Promise.all([
+  const [customer, bills, allPayments, billingHistory, billingLogs, ampereTiers, allCustomers] = await Promise.all([
     getCustomerById(customerId),
     getBillsByCustomer(customerId),
     getAllPayments(),
     getBillingHistoryByCustomer(customerId),
     getBillingChangeLogsByCustomer(customerId),
+    getAmperePrices(),
+    getAllCustomers(),
   ]);
 
   if (!customer) notFound();
@@ -63,6 +69,9 @@ export default async function ManagerCustomerDetailPage({
                 ? `${customer.fixedDiscountPercent}%`
                 : "—"}
             </p>
+            <p className="text-slate-500 text-sm mt-1">
+              Region: <span className="font-medium">{formatRegion(customer.region)}</span>
+            </p>
           </div>
 
           <div className="bg-white rounded-lg border border-slate-200 p-6">
@@ -73,6 +82,7 @@ export default async function ManagerCustomerDetailPage({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm mb-4">
               <p className="text-slate-700">Billing type: <span className="font-medium">{customer.billingType}</span></p>
               <p className="text-slate-700">Status: <span className="font-medium">{customer.status}</span></p>
+              <p className="text-slate-700">Region: <span className="font-medium">{formatRegion(customer.region)}</span></p>
               {customer.billingType === "FIXED_MONTHLY" ? (
                 <p className="text-slate-700">Plan: <span className="font-medium">Fixed monthly (ma2touua)</span></p>
               ) : (
@@ -80,6 +90,18 @@ export default async function ManagerCustomerDetailPage({
               )}
               <p className="text-slate-700">Fixed monthly: <span className="font-medium">{(customer.fixedMonthlyPrice ?? 0).toLocaleString()}</span></p>
             </div>
+            <details className="mb-4 rounded border border-slate-200 p-4">
+              <summary className="cursor-pointer text-sm font-medium text-slate-700 hover:text-primary-600">
+                Edit customer (manager)
+              </summary>
+              <div className="mt-4">
+                <EditCustomerForm
+                  customer={customer}
+                  ampereTiers={ampereTiers}
+                  allCustomers={allCustomers}
+                />
+              </div>
+            </details>
             <div className="rounded border border-slate-200 p-4">
               <MonthlyBillingProfilePanel
                 customer={customer}

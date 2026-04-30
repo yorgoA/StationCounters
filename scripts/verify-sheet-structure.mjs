@@ -31,7 +31,7 @@ const EXPECTED_HEADERS = [
   "customerId", "fullName", "phone", "area", "building", "floor", "apartmentNumber",
   "subscribedAmpere", "billingType", "fixedDiscountAmount", "status", "notes",
   "createdAt", "freeReason", "fixedDiscountPercent", "isMonitor", "linkedCustomerId",
-  "monitorCategory", "fixedMonthlyPrice",
+  "monitorCategory", "fixedMonthlyPrice", "region",
 ];
 
 async function main() {
@@ -54,7 +54,7 @@ async function main() {
 
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: "Customers!A1:S500",
+    range: "Customers!A1:T500",
   });
   const rows = res.data.values || [];
   const header = (rows[0] || []).map((h) => String(h || "").trim());
@@ -112,7 +112,9 @@ async function main() {
   console.log("  Col P (isMonitor):", row[15] ?? "(empty)");
   console.log("  Col Q (linkedCustomerId):", row[16] ?? "(empty)");
   console.log("  Col R (monitorCategory):", row[17] ?? "(empty)");
+  console.log("  Col R (monitorCategory):", row[17] ?? "(empty)");
   console.log("  Col S (fixedMonthlyPrice):", row[18] ?? "(empty)");
+  console.log("  Col T (region):", row[19] ?? "(empty)");
   console.log("");
 }
 

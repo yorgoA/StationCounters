@@ -6,9 +6,11 @@ import {
   getKwhPriceForMonth,
   getSettings,
 } from "@/lib/google-sheets";
+import { customerMatchesRegion, formatRegion, parseRegionFilter } from "@/lib/region";
 import { ensureFixedMonthlyBillsForMonth } from "@/lib/fixed-monthly-auto-billing";
 import Link from "next/link";
 import DashboardMonthSelect from "./DashboardMonthSelect";
+import ManagerRegionSelect from "./ManagerRegionSelect";
 import MoneyUsdRateForm from "./money/MoneyUsdRateForm";
 
 function getCurrentMonthKey() {
@@ -65,10 +67,11 @@ function isExcludedFromCollection(
 export default async function ManagerDashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string }>;
+  searchParams: Promise<{ month?: string; region?: string }>;
 }) {
   const params = await searchParams;
   const monthKey = params.month || getPreviousMonthKey();
+  const regionFilter = parseRegionFilter(params.region);
   await ensureFixedMonthlyBillsForMonth(monthKey);
 
   const [customers, bills, settings, monthKwhPrice] = await Promise.all([
@@ -77,7 +80,9 @@ export default async function ManagerDashboardPage({
     getSettings(),
     getKwhPriceForMonth(monthKey),
   ]);
-  const monthBills = bills.filter((b) => b.monthKey === monthKey);
+  const filteredCustomers = customers.filter((c) => customerMatchesRegion(c, regionFilter));
+  const allowedCustomerIds = new Set(filteredCustomers.map((c) => c.customerId));
+  const monthBills = bills.filter((b) => b.monthKey === monthKey && allowedCustomerIds.has(b.customerId));
 
   const billMonths = Array.from(new Set(bills.map((b) => b.monthKey)));
   const currentKey = getCurrentMonthKey();
@@ -85,15 +90,15 @@ export default async function ManagerDashboardPage({
   const allMonths = new Set([...billMonths, currentKey, previousKey]);
   const months = Array.from(allMonths).sort().reverse();
 
-  const customerMap = new Map(customers.map((c) => [c.customerId, c]));
-  const monitorIds = new Set(customers.filter((c) => c.isMonitor).map((c) => c.customerId));
+  const customerMap = new Map(filteredCustomers.map((c) => [c.customerId, c]));
   const freeIds = new Set(
-    customers.filter((c) => c.billingType === "FREE" && !c.isMonitor).map((c) => c.customerId)
+    filteredCustomers.filter((c) => c.billingType === "FREE" && !c.isMonitor).map((c) => c.customerId)
   );
 
   const currentPayingBills = monthBills.filter((b) => !isExcludedFromCollection(b, customerMap.get(b.customerId)));
   const previousPayingBills = bills.filter(
     (b) => {
+      if (!allowedCustomerIds.has(b.customerId)) return false;
       if (!isBeforeMonth(b.monthKey, monthKey)) return false;
       if (isExcludedFromCollection(b, customerMap.get(b.customerId))) return false;
       if (!(b.remainingDue > 0)) return false;
@@ -112,7 +117,7 @@ export default async function ManagerDashboardPage({
     .reduce((s, b) => s + b.usageKwh, 0);
   const kwhPrice = monthKwhPrice > 0 ? monthKwhPrice : settings.kwhPrice;
   const billByCustomer = new Map(monthBills.map((b) => [b.customerId, b]));
-  const monitorRows = customers.filter((c) => c.isMonitor);
+  const monitorRows = filteredCustomers.filter((c) => c.isMonitor);
   const monitorExcessKwh = monitorRows.reduce((sum, monitor) => {
     const links = monitor.linkedCustomerIds?.length
       ? monitor.linkedCustomerIds
@@ -132,9 +137,9 @@ export default async function ManagerDashboardPage({
     return sum + Math.max(0, monitorUsage - included);
   }, 0);
   const totalKwhProduced = payingKwh + freeKwh + monitorExcessKwh;
-  const totalCustomers = customers.filter((c) => !c.isMonitor);
+  const totalCustomers = filteredCustomers.filter((c) => !c.isMonitor);
   const activeCustomers = totalCustomers.filter((c) => c.status === "ACTIVE");
-  const monitorCount = customers.filter((c) => c.isMonitor).length;
+  const monitorCount = filteredCustomers.filter((c) => c.isMonitor).length;
   const usdRate = settings.usdRate > 0 ? settings.usdRate : 89700;
 
   return (
@@ -145,7 +150,7 @@ export default async function ManagerDashboardPage({
             Manager Home
           </h1>
           <p className="text-slate-500 mt-1">
-            High-level overview for {formatMonthKey(monthKey)}
+            High-level overview for {formatMonthKey(monthKey)} - {formatRegion(regionFilter)}
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-4">
@@ -154,7 +159,11 @@ export default async function ManagerDashboardPage({
           <label className="block text-sm font-medium text-slate-600 mb-1">
             View month
           </label>
-          <DashboardMonthSelect months={months} currentMonth={monthKey} />
+          <DashboardMonthSelect months={months} currentMonth={monthKey} region={regionFilter} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-600 mb-1">Region</label>
+            <ManagerRegionSelect basePath="/manager" month={monthKey} currentRegion={regionFilter} />
           </div>
         </div>
       </div>
@@ -235,13 +244,13 @@ export default async function ManagerDashboardPage({
           </div>
         </div>
         <div className="flex flex-wrap gap-3">
-          <Link href={`/manager/money?month=${monthKey}`} className="text-primary-600 font-medium hover:underline">
+          <Link href={`/manager/money?month=${monthKey}&region=${regionFilter}`} className="text-primary-600 font-medium hover:underline">
             Open Money Dashboard →
           </Link>
-          <Link href={`/manager/kwh?month=${monthKey}`} className="text-primary-600 font-medium hover:underline">
+          <Link href={`/manager/kwh?month=${monthKey}&region=${regionFilter}`} className="text-primary-600 font-medium hover:underline">
             Open kWh Dashboard →
           </Link>
-          <Link href={`/manager/monitors?month=${monthKey}`} className="text-primary-600 font-medium hover:underline">
+          <Link href={`/manager/monitors?month=${monthKey}&region=${regionFilter}`} className="text-primary-600 font-medium hover:underline">
             Open Monitors →
           </Link>
         </div>

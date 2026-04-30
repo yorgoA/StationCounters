@@ -7,6 +7,7 @@ import {
   getBillsByCustomer,
   getAmperePrices,
 } from "@/lib/google-sheets";
+import { parseRegionFilter } from "@/lib/region";
 import { getAmperePriceForTier } from "@/lib/billing";
 
 function formatMonthKey(key: string) {
@@ -18,10 +19,14 @@ function formatMonthKey(key: string) {
 
 export default async function FreeCustomerDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ customerId: string }>;
+  searchParams: Promise<{ region?: string }>;
 }) {
   const { customerId } = await params;
+  const query = await searchParams;
+  const regionFilter = parseRegionFilter(query.region);
   const [customer, bills, ampereTiers] = await Promise.all([
     getCustomerById(customerId),
     getBillsByCustomer(customerId),
@@ -40,7 +45,7 @@ export default async function FreeCustomerDetailPage({
     <div>
       <div className="mb-6">
         <Link
-          href="/manager/free-customers"
+          href={`/manager/free-customers?region=${regionFilter}`}
           className="text-primary-600 hover:text-primary-700 text-sm"
         >
           ← Back to Free Customers

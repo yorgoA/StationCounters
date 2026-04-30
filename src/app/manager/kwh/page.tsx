@@ -7,6 +7,8 @@ import {
   getKwhPriceForMonth,
   getSettings,
 } from "@/lib/google-sheets";
+import { customerMatchesRegion, formatRegion, parseRegionFilter } from "@/lib/region";
+import ManagerRegionSelect from "../ManagerRegionSelect";
 import KwhMonthSelect from "./KwhMonthSelect";
 
 function getCurrentMonthKey() {
@@ -47,10 +49,11 @@ function isExcludedFromCollection(
 export default async function ManagerKwhPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string }>;
+  searchParams: Promise<{ month?: string; region?: string }>;
 }) {
   const params = await searchParams;
   const monthKey = params.month || getPreviousMonthKey();
+  const regionFilter = parseRegionFilter(params.region);
   await ensureFixedMonthlyBillsForMonth(monthKey);
 
   const [customers, bills, settings, monthKwhPrice] = await Promise.all([
@@ -66,12 +69,13 @@ export default async function ManagerKwhPage({
     new Set([...billMonths, getCurrentMonthKey(), getPreviousMonthKey()])
   ).sort().reverse();
 
-  const monthBills = bills.filter((b) => b.monthKey === monthKey);
-  const customerMap = new Map(customers.map((c) => [c.customerId, c]));
-  const activeCustomers = customers.filter((c) => c.status === "ACTIVE");
-  const monitorIds = new Set(activeCustomers.filter((c) => c.isMonitor).map((c) => c.customerId));
+  const filteredCustomers = customers.filter((c) => customerMatchesRegion(c, regionFilter));
+  const allowedCustomerIds = new Set(filteredCustomers.map((c) => c.customerId));
+  const monthBills = bills.filter((b) => b.monthKey === monthKey && allowedCustomerIds.has(b.customerId));
+  const customerMap = new Map(filteredCustomers.map((c) => [c.customerId, c]));
+  const activeCustomers = filteredCustomers.filter((c) => c.status === "ACTIVE");
   const freeIds = new Set(
-    customers.filter((c) => c.billingType === "FREE" && !c.isMonitor).map((c) => c.customerId)
+    filteredCustomers.filter((c) => c.billingType === "FREE" && !c.isMonitor).map((c) => c.customerId)
   );
   const payingBills = monthBills.filter((b) => !isExcludedFromCollection(b, customerMap.get(b.customerId)));
   const freeBills = monthBills.filter((b) => freeIds.has(b.customerId));
@@ -98,7 +102,7 @@ export default async function ManagerKwhPage({
     const firstLinkedBill = billByCustomer.get(links[0]);
     const monitorUsage = (monitorBill ?? firstLinkedBill)?.usageKwh ?? 0;
     const included = links.reduce((acc, linkedId) => {
-      const linked = customers.find((x) => x.customerId === linkedId);
+      const linked = filteredCustomers.find((x) => x.customerId === linkedId);
       if (!linked) return acc;
       if (linked.billingType !== "FIXED_MONTHLY" || linked.isMonitor) return acc;
       return acc + (kwhPrice > 0 ? linked.fixedMonthlyPrice / kwhPrice : 0);
@@ -120,11 +124,15 @@ export default async function ManagerKwhPage({
       <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">kWh Dashboard</h1>
-          <p className="text-slate-500 mt-1">Usage view for {formatMonthKey(monthKey)}.</p>
+          <p className="text-slate-500 mt-1">Usage view for {formatMonthKey(monthKey)} - {formatRegion(regionFilter)}.</p>
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-600 mb-1">Month</label>
-          <KwhMonthSelect months={months} currentMonth={monthKey} />
+          <KwhMonthSelect months={months} currentMonth={monthKey} region={regionFilter} />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-600 mb-1">Region</label>
+          <ManagerRegionSelect basePath="/manager/kwh" month={monthKey} currentRegion={regionFilter} />
         </div>
       </div>
 

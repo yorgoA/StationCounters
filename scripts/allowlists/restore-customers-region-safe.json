@@ -1,0 +1,19 @@
+{
+  "allow": [
+    {
+      "sheet": "Customers",
+      "column": "isMonitor",
+      "kind": "cell_updated"
+    },
+    {
+      "sheet": "Customers",
+      "column": "fixedMonthlyPrice",
+      "kind": "cell_updated"
+    },
+    {
+      "sheet": "Customers",
+      "column": "region",
+      "kind": "cell_updated"
+    }
+  ]
+}

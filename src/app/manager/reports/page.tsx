@@ -2,6 +2,8 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { getAllBills, getAllCustomers } from "@/lib/google-sheets";
+import { customerMatchesRegion, formatRegion, parseRegionFilter } from "@/lib/region";
+import ManagerRegionSelect from "../ManagerRegionSelect";
 
 function formatMonthKey(monthKey: string) {
   const [year, month] = monthKey.split("-");
@@ -9,11 +11,21 @@ function formatMonthKey(monthKey: string) {
   return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
 }
 
-export default async function ManagerReportsPage() {
+export default async function ManagerReportsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ region?: string }>;
+}) {
+  const params = await searchParams;
+  const regionFilter = parseRegionFilter(params.region);
   const [bills, customers] = await Promise.all([getAllBills(), getAllCustomers()]);
+  const filteredCustomers = customers.filter((c) => customerMatchesRegion(c, regionFilter));
+  const allowedCustomerIds = new Set(filteredCustomers.map((c) => c.customerId));
 
-  const monitorCustomerIds = new Set(customers.filter((c) => c.isMonitor).map((c) => c.customerId));
-  const payingBills = bills.filter((b) => !monitorCustomerIds.has(b.customerId));
+  const monitorCustomerIds = new Set(filteredCustomers.filter((c) => c.isMonitor).map((c) => c.customerId));
+  const payingBills = bills.filter(
+    (b) => allowedCustomerIds.has(b.customerId) && !monitorCustomerIds.has(b.customerId)
+  );
 
   // Group bills by monthKey
   const monthBills = new Map<string, typeof bills>();
@@ -51,10 +63,18 @@ export default async function ManagerReportsPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-slate-800 mb-6">Monthly Reports</h1>
-      <p className="text-slate-500 mb-8">
-        Historical overview: money collected and kWh consumed per month.
-      </p>
+      <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800">Monthly Reports</h1>
+          <p className="text-slate-500 mt-1">
+            Historical overview for {formatRegion(regionFilter)}: money collected and kWh consumed per month.
+          </p>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-600 mb-1">Region</label>
+          <ManagerRegionSelect basePath="/manager/reports" currentRegion={regionFilter} />
+        </div>
+      </div>
 
       <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
         <table className="min-w-full divide-y divide-slate-200">
@@ -112,7 +132,7 @@ export default async function ManagerReportsPage() {
                 <td className="px-4 py-3 text-center">
                   {r.unpaidCount > 0 ? (
                     <Link
-                      href={`/manager/reports/${r.monthKey}/unpaid`}
+                      href={`/manager/reports/${r.monthKey}/unpaid?region=${regionFilter}`}
                       className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-amber-50 text-amber-800 hover:bg-amber-100 font-medium text-sm"
                     >
                       View {r.unpaidCount} unpaid
@@ -123,7 +143,7 @@ export default async function ManagerReportsPage() {
                 </td>
                 <td className="px-4 py-3 text-center">
                   <Link
-                    href={`/manager/print-bills/${r.monthKey}`}
+                    href={`/manager/print-bills/${r.monthKey}?region=${regionFilter}`}
                     className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-slate-100 text-slate-700 hover:bg-slate-200 font-medium text-sm"
                   >
                     Print bills

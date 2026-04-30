@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { getAllBills, getAllCustomers } from "@/lib/google-sheets";
 import { ensureFixedMonthlyBillsForMonth } from "@/lib/fixed-monthly-auto-billing";
+import { customerMatchesRegion, formatRegion, parseRegionFilter } from "@/lib/region";
 import BillsMonthSelect from "./BillsMonthSelect";
 
 function getCurrentMonthKey() {
@@ -12,10 +13,11 @@ function getCurrentMonthKey() {
 export default async function ManagerBillsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string; status?: string }>;
+  searchParams: Promise<{ month?: string; status?: string; region?: string }>;
 }) {
   const params = await searchParams;
   const monthKey = params.month || getCurrentMonthKey();
+  const regionFilter = parseRegionFilter(params.region);
   const statusParam = String(params.status || "").toLowerCase();
   const statusFilter: "all" | "paid" | "partial" | "unpaid" =
     statusParam === "paid" || statusParam === "partial" || statusParam === "unpaid"
@@ -23,9 +25,12 @@ export default async function ManagerBillsPage({
       : "all";
   await ensureFixedMonthlyBillsForMonth(monthKey);
   const [bills, customers] = await Promise.all([getAllBills(), getAllCustomers()]);
+  const filteredCustomers = customers.filter((c) => customerMatchesRegion(c, regionFilter));
+  const allowedCustomerIds = new Set(filteredCustomers.map((c) => c.customerId));
+  const customerMap = new Map(filteredCustomers.map((c) => [c.customerId, c]));
 
-  const monitorCustomerIds = new Set(customers.filter((c) => c.isMonitor).map((c) => c.customerId));
-  const payingBills = bills.filter((b) => !monitorCustomerIds.has(b.customerId));
+  const monitorCustomerIds = new Set(filteredCustomers.filter((c) => c.isMonitor).map((c) => c.customerId));
+  const payingBills = bills.filter((b) => allowedCustomerIds.has(b.customerId) && !monitorCustomerIds.has(b.customerId));
 
   const monthBills = payingBills
     .filter((b) => b.monthKey === monthKey)
@@ -42,11 +47,13 @@ export default async function ManagerBillsPage({
   return (
     <div>
       <h1 className="text-2xl font-bold text-slate-800 mb-6">Bills</h1>
+      <p className="text-slate-500 mb-4">Region: {formatRegion(regionFilter)}</p>
       <div className="mb-4">
         <BillsMonthSelect
           months={months}
           currentMonth={monthKey}
           currentStatus={statusFilter}
+          currentRegion={regionFilter}
         />
       </div>
       <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
@@ -63,7 +70,7 @@ export default async function ManagerBillsPage({
           </thead>
           <tbody className="divide-y divide-slate-200">
             {monthBills.map((b) => {
-              const cust = customers.find((c) => c.customerId === b.customerId);
+              const cust = customerMap.get(b.customerId);
               return (
                 <tr key={b.billId} className="hover:bg-slate-50">
                   <td className="px-4 py-3 text-slate-800 font-medium">

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { updateCustomerAction } from "@/app/actions/customer";
+import { formatRegion, REGION_OPTIONS } from "@/lib/region";
 import type { AmperePriceTier, Customer, BillingType } from "@/types";
 import { MONITOR_CATEGORIES } from "@/types";
 
@@ -34,6 +35,7 @@ export default function EditCustomerForm({
   const [fixedDiscountPercent, setFixedDiscountPercent] = useState(
     String(customer.fixedDiscountPercent || "")
   );
+  const [region, setRegion] = useState<Customer["region"]>(customer.region ?? "MRAH_GHANEM");
   const [activeChecked, setActiveChecked] = useState(customer.status === "ACTIVE");
   const [monitorChecked, setMonitorChecked] = useState(customer.isMonitor ?? false);
   const initialLinked =
@@ -78,6 +80,7 @@ export default function EditCustomerForm({
     const result = await updateCustomerAction({
       ...customer,
       subscribedAmpere,
+      region,
       billingType: effectiveBillingType,
       fixedMonthlyPrice: effectiveBillingType === "FIXED_MONTHLY" ? fixedMonthlyPrice : 0,
       fixedDiscountAmount: useAmount ? amt : 0,
@@ -115,6 +118,20 @@ export default function EditCustomerForm({
           </select>
         </div>
       )}
+      <div>
+        <label className="block text-sm font-medium text-slate-700 mb-1">Region</label>
+        <select
+          value={region}
+          onChange={(e) => setRegion(e.target.value as Customer["region"])}
+          className="input"
+        >
+          {REGION_OPTIONS.map((r) => (
+            <option key={r} value={r}>
+              {formatRegion(r)}
+            </option>
+          ))}
+        </select>
+      </div>
       <div>
         <label className="flex items-center gap-2 cursor-pointer">
           <input

@@ -143,6 +143,11 @@ function csvRowToCustomerAndBill(row, monthKey) {
     notes: "",
     createdAt: now,
     freeReason: "",
+    isMonitor: false,
+    linkedCustomerId: "",
+    monitorCategory: "",
+    fixedMonthlyPrice: 0,
+    region: "MRAH_GHANEM",
   };
 
   // Split into ampereCharge/consumptionCharge is applied later using Settings & AmperePrices
@@ -219,6 +224,12 @@ function customerToRow(c) {
     c.notes,
     c.createdAt,
     c.freeReason ?? "",
+    String(c.fixedDiscountPercent ?? 0),
+    c.isMonitor ? "true" : "false",
+    c.linkedCustomerId ?? "",
+    c.monitorCategory ?? "",
+    String(c.fixedMonthlyPrice ?? 0),
+    c.region ?? "MRAH_GHANEM",
   ];
 }
 
@@ -357,6 +368,11 @@ async function main() {
     "createdAt",
     "freeReason",
     "fixedDiscountPercent",
+    "isMonitor",
+    "linkedCustomerId",
+    "monitorCategory",
+    "fixedMonthlyPrice",
+    "region",
   ];
 
   const values = [headerRow, ...customers.map(customerToRow)];

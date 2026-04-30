@@ -1,6 +1,8 @@
 export const dynamic = "force-dynamic";
 
 import { getAllCustomers, getAllBills, getKwhPriceForMonth } from "@/lib/google-sheets";
+import { customerMatchesRegion, formatRegion, parseRegionFilter } from "@/lib/region";
+import ManagerRegionSelect from "../ManagerRegionSelect";
 import MonitorsMonthSelect from "./MonitorsMonthSelect";
 import MonitorsTable from "./MonitorsTable";
 
@@ -26,9 +28,10 @@ function formatMonthKey(monthKey: string) {
 export default async function MonitorsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string }>;
+  searchParams: Promise<{ month?: string; region?: string }>;
 }) {
   const params = await searchParams;
+  const regionFilter = parseRegionFilter(params.region);
   const [customers, bills] = await Promise.all([
     getAllCustomers(),
     getAllBills(),
@@ -36,7 +39,9 @@ export default async function MonitorsPage({
 
   const monthKey = params.month || getPreviousMonthKey();
   const monthKwhPrice = await getKwhPriceForMonth(monthKey);
-  const monthBills = bills.filter((b) => b.monthKey === monthKey);
+  const filteredCustomers = customers.filter((c) => customerMatchesRegion(c, regionFilter));
+  const allowedCustomerIds = new Set(filteredCustomers.map((c) => c.customerId));
+  const monthBills = bills.filter((b) => b.monthKey === monthKey && allowedCustomerIds.has(b.customerId));
 
   const billMonths = Array.from(new Set(bills.map((b) => b.monthKey)));
   const currentKey = getCurrentMonthKey();
@@ -48,8 +53,8 @@ export default async function MonitorsPage({
   ]);
   const months = Array.from(allMonths).sort().reverse();
 
-  const monitors = customers.filter((c) => c.isMonitor);
-  const customerMap = new Map(customers.map((c) => [c.customerId, c]));
+  const monitors = filteredCustomers.filter((c) => c.isMonitor);
+  const customerMap = new Map(filteredCustomers.map((c) => [c.customerId, c]));
   const billByCustomer = new Map(monthBills.map((b) => [b.customerId, b]));
 
   type LinkedRef = {
@@ -122,14 +127,20 @@ export default async function MonitorsPage({
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Monitors</h1>
           <p className="text-slate-500 mt-1">
-            Compare monitor usage vs linked fixed-plan kWh allowance for theft detection.
+            Compare monitor usage vs linked fixed-plan kWh allowance for theft detection in {formatRegion(regionFilter)}.
           </p>
         </div>
-        <div>
+        <div className="flex flex-wrap items-end gap-4">
+          <div>
           <label className="block text-sm font-medium text-slate-600 mb-1">
             Month
           </label>
-          <MonitorsMonthSelect months={months} currentMonth={monthKey} />
+          <MonitorsMonthSelect months={months} currentMonth={monthKey} region={regionFilter} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-600 mb-1">Region</label>
+            <ManagerRegionSelect basePath="/manager/monitors" month={monthKey} currentRegion={regionFilter} />
+          </div>
         </div>
       </div>
 

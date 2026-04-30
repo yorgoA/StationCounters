@@ -25,6 +25,7 @@ export async function createCustomerAction(input: CreateCustomerInput) {
     fullName: input.fullName,
     phone: input.phone,
     area: input.area,
+    region: input.region ?? "MRAH_GHANEM",
     building: input.building,
     floor: input.floor,
     apartmentNumber: input.apartmentNumber,
