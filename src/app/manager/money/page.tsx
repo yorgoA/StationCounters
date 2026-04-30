@@ -151,6 +151,11 @@ export default async function ManagerMoneyPage({
   const totalToBePaid = monthPayingBills.reduce((s, b) => s + b.totalDue, 0);
   const totalCollected = monthPayingBills.reduce((s, b) => s + b.totalPaid, 0);
   const unpaidTotal = monthPayingBills.reduce((s, b) => s + b.remainingDue, 0);
+  const carryOverIncludedInInvoices = monthPayingBills.reduce(
+    (s, b) => s + (b.previousUnpaidBalance || 0),
+    0
+  );
+  const currentMonthChargesOnly = Math.max(0, totalToBePaid - carryOverIncludedInInvoices);
   const previousUnpaid = previousPayingBills.reduce((s, b) => s + b.remainingDue, 0);
   const unpaidRows = monthPayingBills
     .filter((b) => b.remainingDue > 0)
@@ -211,6 +216,33 @@ export default async function ManagerMoneyPage({
           <p className="text-sm text-slate-500">Unpaid total</p>
           <p className="text-2xl font-bold text-amber-600">{unpaidTotal.toLocaleString()}</p>
           <p className="text-xs text-slate-500 mt-1">${usdOf(unpaidTotal, usdRate)}</p>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-lg border border-slate-200 p-6 mb-8">
+        <h2 className="font-semibold text-slate-800 mb-4">Invoice composition ({formatMonthKey(monthKey)})</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="rounded border border-slate-200 p-4">
+            <p className="text-sm text-slate-500">Current month charges only</p>
+            <p className="text-xl font-bold text-slate-800">
+              {currentMonthChargesOnly.toLocaleString()} LBP
+            </p>
+            <p className="text-xs text-slate-500 mt-1">${usdOf(currentMonthChargesOnly, usdRate)}</p>
+          </div>
+          <div className="rounded border border-slate-200 p-4">
+            <p className="text-sm text-slate-500">Carry-over included in invoices</p>
+            <p className="text-xl font-bold text-amber-700">
+              {carryOverIncludedInInvoices.toLocaleString()} LBP
+            </p>
+            <p className="text-xs text-slate-500 mt-1">${usdOf(carryOverIncludedInInvoices, usdRate)}</p>
+          </div>
+          <div className="rounded border border-slate-200 p-4">
+            <p className="text-sm text-slate-500">Total to be paid (sum)</p>
+            <p className="text-xl font-bold text-slate-800">
+              {totalToBePaid.toLocaleString()} LBP
+            </p>
+            <p className="text-xs text-slate-500 mt-1">${usdOf(totalToBePaid, usdRate)}</p>
+          </div>
         </div>
       </div>
 

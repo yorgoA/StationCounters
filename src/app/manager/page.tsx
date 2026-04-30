@@ -107,6 +107,11 @@ export default async function ManagerDashboardPage({
   );
 
   const totalToBePaid = currentPayingBills.reduce((s, b) => s + b.totalDue, 0);
+  const carryOverIncludedInInvoices = currentPayingBills.reduce(
+    (s, b) => s + (b.previousUnpaidBalance || 0),
+    0
+  );
+  const currentMonthChargesOnly = Math.max(0, totalToBePaid - carryOverIncludedInInvoices);
   const collected = currentPayingBills.reduce((s, b) => s + b.totalPaid, 0);
   const unpaidCurrentMonth = currentPayingBills.reduce((s, b) => s + b.remainingDue, 0);
   const previousUnpaid = previousPayingBills.reduce((s, b) => s + b.remainingDue, 0);
@@ -118,13 +123,13 @@ export default async function ManagerDashboardPage({
   const kwhPrice = monthKwhPrice > 0 ? monthKwhPrice : settings.kwhPrice;
   const billByCustomer = new Map(monthBills.map((b) => [b.customerId, b]));
   const monitorRows = filteredCustomers.filter((c) => c.isMonitor);
-  const monitorExcessKwh = monitorRows.reduce((sum, monitor) => {
+  const monitorStats = monitorRows.reduce((acc, monitor) => {
     const links = monitor.linkedCustomerIds?.length
       ? monitor.linkedCustomerIds
       : monitor.linkedCustomerId
         ? [monitor.linkedCustomerId]
         : [];
-    if (links.length === 0) return sum;
+    if (links.length === 0) return acc;
     const monitorBill = billByCustomer.get(monitor.customerId);
     const firstLinkedBill = billByCustomer.get(links[0]);
     const monitorUsage = (monitorBill ?? firstLinkedBill)?.usageKwh ?? 0;
@@ -134,9 +139,14 @@ export default async function ManagerDashboardPage({
       if (linked.billingType !== "FIXED_MONTHLY" || linked.isMonitor) return acc;
       return acc + (kwhPrice > 0 ? linked.fixedMonthlyPrice / kwhPrice : 0);
     }, 0);
-    return sum + Math.max(0, monitorUsage - included);
-  }, 0);
-  const totalKwhProduced = payingKwh + freeKwh + monitorExcessKwh;
+    return {
+      actual: acc.actual + monitorUsage,
+      excess: acc.excess + Math.max(0, monitorUsage - included),
+    };
+  }, { actual: 0, excess: 0 });
+  const monitorActualKwh = monitorStats.actual;
+  const monitorExcessKwh = monitorStats.excess;
+  const totalKwhProduced = payingKwh + freeKwh + monitorActualKwh;
   const totalCustomers = filteredCustomers.filter((c) => !c.isMonitor);
   const activeCustomers = totalCustomers.filter((c) => c.status === "ACTIVE");
   const monitorCount = filteredCustomers.filter((c) => c.isMonitor).length;
@@ -192,6 +202,30 @@ export default async function ManagerDashboardPage({
             {collected.toLocaleString()}
           </p>
           <p className="text-xs text-slate-500 mt-1">${usdOf(collected, usdRate)}</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div className="bg-white rounded-lg border border-slate-200 p-5">
+          <p className="text-sm text-slate-500">Current month charges only</p>
+          <p className="text-2xl font-bold text-slate-800 break-words leading-tight">
+            {currentMonthChargesOnly.toLocaleString()}
+          </p>
+          <p className="text-xs text-slate-500 mt-1">${usdOf(currentMonthChargesOnly, usdRate)}</p>
+        </div>
+        <div className="bg-white rounded-lg border border-slate-200 p-5">
+          <p className="text-sm text-slate-500">Carry-over included in invoices</p>
+          <p className="text-2xl font-bold text-amber-700 break-words leading-tight">
+            {carryOverIncludedInInvoices.toLocaleString()}
+          </p>
+          <p className="text-xs text-slate-500 mt-1">${usdOf(carryOverIncludedInInvoices, usdRate)}</p>
+        </div>
+        <div className="bg-white rounded-lg border border-slate-200 p-5">
+          <p className="text-sm text-slate-500">Total to be paid (sum)</p>
+          <p className="text-2xl font-bold text-slate-800 break-words leading-tight">
+            {totalToBePaid.toLocaleString()}
+          </p>
+          <p className="text-xs text-slate-500 mt-1">${usdOf(totalToBePaid, usdRate)}</p>
         </div>
       </div>
 
