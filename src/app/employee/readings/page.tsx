@@ -24,7 +24,7 @@ export default async function EmployeeReadingsPage({
   searchParams: Promise<{ month?: string; region?: string }>;
 }) {
   const params = await searchParams;
-  const regionFilter = parseRegionFilter(params.region);
+  const regionFilter = parseRegionFilter(params.region ?? "PRINTANIA");
   const [customers, bills] = await Promise.all([getAllCustomers(), getAllBills()]);
   const activeCustomers = customers.filter(
     (c) => c.status === "ACTIVE" && customerMatchesRegion(c, regionFilter)

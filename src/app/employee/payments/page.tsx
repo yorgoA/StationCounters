@@ -11,7 +11,7 @@ export default async function EmployeePaymentsPage({
   searchParams: Promise<{ region?: string }>;
 }) {
   const params = await searchParams;
-  const regionFilter = parseRegionFilter(params.region);
+  const regionFilter = parseRegionFilter(params.region ?? "PRINTANIA");
   const [customers, bills] = await Promise.all([getAllCustomers(), getAllBills()]);
   const filteredCustomers = customers.filter((c) => customerMatchesRegion(c, regionFilter));
   const allowedCustomerIds = new Set(filteredCustomers.map((c) => c.customerId));
