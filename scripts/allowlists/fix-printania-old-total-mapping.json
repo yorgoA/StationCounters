@@ -1,0 +1,12 @@
+[
+  {
+    "sheet": "Bills",
+    "kind": "row_added",
+    "keyPrefix": "bill_"
+  },
+  {
+    "sheet": "Bills",
+    "kind": "cell_updated",
+    "column": "customerId"
+  }
+]

@@ -1,0 +1,14 @@
+[
+  {
+    "sheet": "Customers",
+    "kind": "cell_updated",
+    "keyPrefix": "cust_",
+    "column": "billingType"
+  },
+  {
+    "sheet": "Customers",
+    "kind": "cell_updated",
+    "keyPrefix": "cust_",
+    "column": "freeReason"
+  }
+]

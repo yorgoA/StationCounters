@@ -65,7 +65,7 @@ export function rowToCustomer(row: string[]): Customer {
     notes: r[11] || "",
     createdAt: r[12] || new Date().toISOString(),
     freeReason: r[13] || "",
-    isMonitor: r[15] === "true" || r[15] === "1",
+    isMonitor: parseSheetBoolean(r[15]),
     linkedCustomerId: r[16] || undefined,
     linkedCustomerIds: parseLinkedCustomerIds(r[16]),
     monitorCategory: r[17]?.trim() || undefined,
@@ -81,6 +81,11 @@ function normalizeRegion(raw: string | undefined): Region {
 function parseLinkedCustomerIds(val: string | undefined): string[] {
   if (!val || !val.trim()) return [];
   return val.split(",").map((s) => s.trim()).filter(Boolean);
+}
+
+function parseSheetBoolean(raw: string | undefined): boolean {
+  const normalized = String(raw || "").trim().toLowerCase();
+  return normalized === "true" || normalized === "1" || normalized === "yes";
 }
 
 export function customerToRow(c: Customer): string[] {
@@ -250,7 +255,7 @@ export function rowToCustomerBillingHistory(row: string[]): CustomerBillingHisto
     fixedMonthlyPrice: parseFloat(r[5] || "0") || 0,
     fixedDiscountAmount: parseFloat(r[6] || "0") || 0,
     fixedDiscountPercent: parseFloat(r[7] || "0") || 0,
-    isMonitor: r[8] === "true" || r[8] === "1",
+    isMonitor: parseSheetBoolean(r[8]),
     reason: r[9] || "",
     updatedByRole: (r[10] || "manager") as CustomerBillingHistory["updatedByRole"],
     updatedAt: r[11] || "",

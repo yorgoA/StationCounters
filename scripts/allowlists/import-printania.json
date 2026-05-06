@@ -1,0 +1,12 @@
+[
+  {
+    "sheet": "Customers",
+    "kind": "row_added",
+    "keyPrefix": "cust_"
+  },
+  {
+    "sheet": "Bills",
+    "kind": "row_added",
+    "keyPrefix": "bill_"
+  }
+]

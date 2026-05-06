@@ -44,6 +44,7 @@ export default function EditCustomerForm({
       : (customer.linkedCustomerId ? [customer.linkedCustomerId] : []);
   const [linkedCustomerIds, setLinkedCustomerIds] = useState<string[]>(initialLinked);
   const [monitorCategory, setMonitorCategory] = useState(customer.monitorCategory ?? "");
+  const [linkedSearch, setLinkedSearch] = useState("");
 
   const effectiveBillingType = freeChecked ? "FREE" : billingType;
   const showMonitorOption =
@@ -59,6 +60,13 @@ export default function EditCustomerForm({
   const linkableCustomers = allCustomers.filter(
     (c) => c.customerId !== customer.customerId && !c.isMonitor
   );
+  const linkedSearchTerm = linkedSearch.trim().toLowerCase();
+  const filteredLinkableCustomers = linkedSearchTerm
+    ? linkableCustomers.filter((c) => {
+        const haystack = `${c.fullName} ${c.area} ${c.building}`.toLowerCase();
+        return haystack.includes(linkedSearchTerm);
+      })
+    : linkableCustomers;
 
   function toggleLinked(id: string) {
     setLinkedCustomerIds((prev) =>
@@ -238,8 +246,15 @@ export default function EditCustomerForm({
                 </div>
                 <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Linked customers (required, can select multiple) *</label>
+                <input
+                  type="text"
+                  value={linkedSearch}
+                  onChange={(e) => setLinkedSearch(e.target.value)}
+                  placeholder="Search by name, box, or building"
+                  className="input mb-2"
+                />
                 <div className="max-h-48 overflow-y-auto border border-slate-200 rounded-lg p-2 space-y-1 bg-white">
-                  {linkableCustomers.map((c) => (
+                  {filteredLinkableCustomers.map((c) => (
                     <label key={c.customerId} className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-2 rounded">
                       <input
                         type="checkbox"
@@ -252,6 +267,9 @@ export default function EditCustomerForm({
                       </span>
                     </label>
                   ))}
+                  {filteredLinkableCustomers.length === 0 && (
+                    <p className="text-sm text-slate-500 px-2 py-1">No customers match this search.</p>
+                  )}
                 </div>
                 <p className="text-xs text-slate-500 mt-1">
                   Customers whose meters this monitor tracks. At least one required.
